@@ -53,6 +53,8 @@ The current app uses the Claude-designed visual direction from `/home/giddy/temp
 - Employee allowlist CSV upload.
 - Email-gated participant registration with one entry per employee email.
 - Public screens do not display employee email addresses.
+- Admin backup JSON export.
+- Not-joined and participants CSV exports.
 - Shared SQLite database instead of browser-only LocalStorage.
 - Fair draw across all 48 World Cup team slots.
 - Bonus teams distributed evenly when fewer than 48 people join.
@@ -134,6 +136,8 @@ For a proper office deployment, run `npm start` as a Windows service with NSSM, 
 npm test
 npm run build
 ```
+
+See `docs/DEPLOYMENT.md` for Windows service notes, environment variables, and backup checklist.
 
 Full-stack smoke check used during development:
 

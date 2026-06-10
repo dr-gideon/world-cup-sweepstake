@@ -310,6 +310,46 @@ export function lookupEmployee(email) {
   };
 }
 
+export function exportBackupJson() {
+  ensureParticipantEmailColumn();
+  return {
+    exportedAt: new Date().toISOString(),
+    allowedEmployees: db.prepare("SELECT email, name, department, uploaded_at AS uploadedAt FROM allowed_employees ORDER BY email ASC").all(),
+    participants: db.prepare("SELECT email, name, department, created_at AS createdAt FROM participants ORDER BY created_at ASC").all(),
+    teams: db.prepare("SELECT id, name, code, flag, pot, status, note FROM teams ORDER BY rowid ASC").all(),
+    draws: db.prepare("SELECT id, seed, created_at AS createdAt, reveal_index AS revealIndex FROM draws ORDER BY created_at ASC").all(),
+    assignments: db.prepare("SELECT id, draw_id AS drawId, team_id AS teamId, participant_id AS participantId, draw_index AS drawIndex, revealed FROM assignments ORDER BY draw_index ASC").all(),
+    matches: db.prepare("SELECT id, stage, kickoff, home_team_id AS homeTeamId, away_team_id AS awayTeamId, home_score AS homeScore, away_score AS awayScore, status, notes, updated_at AS updatedAt FROM matches ORDER BY updated_at ASC").all(),
+    audit: db.prepare("SELECT at, event, detail FROM audit_events ORDER BY id ASC").all()
+  };
+}
+
+export function exportNotJoinedCsv() {
+  const rows = db.prepare(`
+    SELECT ae.email, ae.name, ae.department
+    FROM allowed_employees ae
+    LEFT JOIN participants p ON p.email = ae.email
+    WHERE p.email IS NULL
+    ORDER BY ae.email ASC
+  `).all();
+  return toCsv(["email", "name", "department"], rows.map((row) => [row.email, row.name, row.department]));
+}
+
+export function exportParticipantsCsv() {
+  ensureParticipantEmailColumn();
+  const rows = db.prepare("SELECT email, name, department, created_at AS createdAt FROM participants ORDER BY created_at ASC").all();
+  return toCsv(["email", "name", "department", "joined_at"], rows.map((row) => [row.email, row.name, row.department, row.createdAt]));
+}
+
+function toCsv(headers, rows) {
+  return [headers, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n") + "\n";
+}
+
+function csvEscape(value) {
+  const text = String(value ?? "");
+  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
 function getAllowlistStats() {
   const eligible = db.prepare("SELECT COUNT(*) AS count FROM allowed_employees").get().count;
   const joined = db.prepare("SELECT COUNT(*) AS count FROM participants").get().count;

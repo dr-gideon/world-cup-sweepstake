@@ -191,3 +191,11 @@ https://github.com/dr-gideon/world-cup-sweepstake
 - Current provider: manual Admin entry stored in SQLite `matches` table.
 - Tele reads latest live/finished matches and upcoming scheduled matches.
 - Future provider integration should write into this same table instead of coupling Tele directly to a paid API.
+
+## Deployment Readiness
+
+- `.env.example` added.
+- `docs/DEPLOYMENT.md` added with Windows service options and backup checklist.
+- Admin exports: full JSON backup, not-joined CSV, participants CSV.
+- Export endpoints require admin auth.
+- Smoke test confirmed unauthenticated export returns 401 and authenticated exports contain expected data.

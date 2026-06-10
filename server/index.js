@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import express from "express";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { addParticipant, createDraw, getState, importAllowlist, initDb, lookupEmployee, removeMatch, removeParticipant, resetSweepstake, revealAll, revealNext, updateTeam, upsertMatch } from "./db.js";
+import { addParticipant, createDraw, exportBackupJson, exportNotJoinedCsv, exportParticipantsCsv, getState, importAllowlist, initDb, lookupEmployee, removeMatch, removeParticipant, resetSweepstake, revealAll, revealNext, updateTeam, upsertMatch } from "./db.js";
 
 const app = express();
 const port = Number(process.env.PORT || 8097);
@@ -43,6 +43,9 @@ app.get("/api/allowlist/lookup", wrap((req, res) => res.json(lookupEmployee(req.
 app.post("/api/participants", wrap((req, res) => res.status(201).json(addParticipant(req.body))));
 
 app.post("/api/allowlist", requireAdmin, express.text({ type: ["text/*", "application/csv", "application/vnd.ms-excel"], limit: "2mb" }), wrap((req, res) => res.status(201).json(importAllowlist(req.body))));
+app.get("/api/export/backup.json", requireAdmin, (req, res) => { res.setHeader("Content-Disposition", `attachment; filename=world-cup-sweepstake-backup-${dateStamp()}.json`); res.json(exportBackupJson()); });
+app.get("/api/export/not-joined.csv", requireAdmin, (req, res) => sendCsv(res, `world-cup-sweepstake-not-joined-${dateStamp()}.csv`, exportNotJoinedCsv()));
+app.get("/api/export/participants.csv", requireAdmin, (req, res) => sendCsv(res, `world-cup-sweepstake-participants-${dateStamp()}.csv`, exportParticipantsCsv()));
 app.delete("/api/participants/:id", requireAdmin, wrap((req, res) => { removeParticipant(req.params.id); res.status(204).end(); }));
 app.patch("/api/teams/:id", requireAdmin, wrap((req, res) => { updateTeam(req.params.id, req.body); res.json(getState()); }));
 app.post("/api/draw", requireAdmin, wrap((req, res) => { createDraw(req.body?.seed); res.status(201).json(getState()); }));
@@ -103,6 +106,16 @@ function safeEqual(a, b) {
   const right = Buffer.from(b);
   if (left.length !== right.length) return false;
   return crypto.timingSafeEqual(left, right);
+}
+
+function sendCsv(res, filename, csv) {
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
+  res.send(csv);
+}
+
+function dateStamp() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function wrap(handler) {

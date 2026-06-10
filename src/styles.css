@@ -191,3 +191,5 @@ nav { position:sticky; top:0; z-index:100; background:rgba(8,12,24,.92); backdro
 .tele-match strong { color:var(--gold); text-align:center; font-family:Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif; font-size:22px; }
 .wide-card { grid-column:1 / -1; }
 @media (max-width:1040px) { .match-form,.match-row,.tele-match { grid-template-columns:1fr; } .match-row strong,.tele-match strong { text-align:left; } }
+a.btn { text-decoration:none; display:inline-flex; align-items:center; justify-content:center; }
+.export-panel { margin-bottom:2rem; }

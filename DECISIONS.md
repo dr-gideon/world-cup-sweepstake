@@ -95,3 +95,10 @@ Rationale: The app needs reliable office operation before adding AI-generated co
 Decision: Add a local SQLite `matches` table and Admin fixture/result editor before integrating any live football API provider. Tele reads from this local match layer.
 
 Rationale: Avoid paid API dependency and provider lock-in while giving the app a stable contract for fixtures/results. A future provider can sync into the same table.
+
+
+## 2026-06-10 — Add deployment readiness exports
+
+Decision: Add admin-only JSON backup, not-joined CSV, and participants CSV exports, plus `.env.example` and deployment documentation.
+
+Rationale: Before real office use, the organiser needs a safe backup path, reminder list, and clear Windows deployment instructions. Export endpoints require admin auth.
