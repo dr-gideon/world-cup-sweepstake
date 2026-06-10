@@ -2,9 +2,20 @@
   "name": "world-cup-sweepstake",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "Office sweepstake app for the 2026 FIFA World Cup.",
   "scripts": {
-    "test": "echo \"No tests yet\"",
-    "dev": "echo \"Stack not selected yet\""
-  }
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "vite": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "lucide-react": "latest"
+  },
+  "devDependencies": {}
 }
