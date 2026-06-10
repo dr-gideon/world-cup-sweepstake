@@ -28,6 +28,7 @@ The current app keeps the Resolve colour influence but switches to a modern even
 - exciting team reveal
 - searchable team board
 - admin booth for participants, teams, and results
+- Tele broadcast view for office screens after matches
 - SQLite-backed shared state
 
 ## Features
@@ -39,6 +40,7 @@ The current app keeps the Resolve colour influence but switches to a modern even
 - Draw blocked if more than 48 people join until shared-team rules are agreed.
 - One-by-one reveal and reveal-all mode.
 - Public team board.
+- Tele view with post-match headline, drama feed, survival board, prize race, and ticker.
 - Editable qualifier team slots.
 - Manual tournament status updates.
 - Prize tracker for winner and runner-up.

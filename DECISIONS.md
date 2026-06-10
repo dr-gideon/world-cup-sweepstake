@@ -53,3 +53,10 @@ Rationale: Entering the sweepstake should feel exciting and fun, not like fillin
 Decision: Move from browser LocalStorage to an Express + SQLite backend using Node built-in `node:sqlite`.
 
 Rationale: Office users need shared registrations, one canonical draw, and consistent results across browsers. Built-in SQLite avoids native package installation problems on Windows.
+
+
+## 2026-06-10 — Add Tele broadcast view
+
+Decision: Add a dedicated Tele view for office screens after matches, backed by richer match-impact audit events when team statuses change.
+
+Rationale: The sweepstake should feel alive during the tournament, with broadcast-style headlines, prize race, survival board, drama feed, and ticker instead of another admin table.

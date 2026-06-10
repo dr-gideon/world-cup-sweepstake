@@ -120,7 +120,19 @@ export function updateTeam(id, patch) {
     note: patch.note ?? current.note
   };
   db.prepare("UPDATE teams SET name = ?, code = ?, flag = ?, pot = ?, status = ?, note = ? WHERE id = ?").run(next.name, next.code, next.flag, next.pot, next.status, next.note, id);
-  if (patch.status) audit("Team status updated", `${next.name} → ${next.status}`);
+  if (patch.status && patch.status !== current.status) {
+    const owner = db.prepare(`
+      SELECT p.name, p.department
+      FROM assignments a
+      JOIN participants p ON p.id = a.participant_id
+      JOIN draws d ON d.id = a.draw_id
+      WHERE a.team_id = ?
+      ORDER BY d.created_at DESC
+      LIMIT 1
+    `).get(id);
+    const ownerText = owner ? `${owner.name}${owner.department ? ` · ${owner.department}` : ""}` : "No owner yet";
+    audit("Match impact", `${next.flag} ${next.name}: ${current.status} → ${next.status} | ${ownerText}`);
+  }
 }
 
 export function createDraw(seed = "office-2026") {

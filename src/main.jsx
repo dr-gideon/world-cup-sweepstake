@@ -4,7 +4,7 @@ import { ChevronRight, Download, Flag, PartyPopper, RefreshCcw, Sparkles, Trophy
 import { STAGES } from "./teams.js";
 import "./styles.css";
 
-const views = ["enter", "draw", "teams", "admin"];
+const views = ["enter", "draw", "teams", "tele", "admin"];
 
 function App() {
   const [state, setState] = useState(null);
@@ -61,6 +61,7 @@ function App() {
       {view === "enter" && <EnterScreen state={state} action={action} goDraw={() => setView("draw")} />}
       {view === "draw" && <DrawScreen state={state} action={action} goTeams={() => setView("teams")} />}
       {view === "teams" && <TeamsScreen state={state} />}
+      {view === "tele" && <TeleScreen state={state} />}
       {view === "admin" && <AdminScreen state={state} action={action} refresh={refresh} />}
     </main>
   </div>;
@@ -183,6 +184,59 @@ function TeamsScreen({ state }) {
   </section>;
 }
 
+function TeleScreen({ state }) {
+  const assignments = state.assignments || [];
+  const latestImpact = state.audit?.find((event) => event.event === "Match impact");
+  const alive = assignments.filter((assignment) => assignment.team.status !== "eliminated");
+  const eliminated = assignments.filter((assignment) => assignment.team.status === "eliminated");
+  const stageGroups = ["winner", "runner-up", "semi", "quarter", "r16", "r32", "group", "active"];
+  const prizes = usePrizes(state);
+
+  return <section className="tele-page">
+    <div className="broadcast-frame">
+      <div className="broadcast-topline"><span>LIVE FROM THE OFFICE DRAW ROOM</span><strong>WORLD CUP SWEEPSTAKE</strong><em>{new Date().toLocaleTimeString("en-IE", { hour: "2-digit", minute: "2-digit" })}</em></div>
+      <div className="broadcast-hero">
+        <div>
+          <p className="kicker"><Sparkles size={16} /> Post-match impact</p>
+          <h1>{latestImpact ? impactHeadline(latestImpact.detail) : "No drama yet. Give it time."}</h1>
+          <p>{latestImpact ? latestImpact.detail : "Update team statuses in Admin after each match and this screen becomes the office broadcast."}</p>
+        </div>
+        <div className="broadcast-scorebug">
+          <strong>{alive.length}</strong><span>still alive</span>
+          <strong>{eliminated.length}</strong><span>eliminated</span>
+        </div>
+      </div>
+
+      <div className="broadcast-grid">
+        <div className="broadcast-card prize-live">
+          <p>Prize race</p>
+          <PrizeMini title="€50 champion" prize={prizes.winner} />
+          <PrizeMini title="€30 runner-up" prize={prizes.runnerUp} />
+        </div>
+        <div className="broadcast-card impact-feed">
+          <p>Drama feed</p>
+          {(state.audit || []).filter((event) => event.event === "Match impact").slice(0, 6).map((event, index) => <div className="impact-row" key={`${event.at}-${index}`}><strong>{impactHeadline(event.detail)}</strong><span>{event.detail}</span></div>)}
+          {!(state.audit || []).some((event) => event.event === "Match impact") && <Empty title="No match impacts yet" text="Change a team status in Admin after a match." />}
+        </div>
+      </div>
+
+      <div className="survival-board">
+        {stageGroups.map((stage) => {
+          const rows = assignments.filter((assignment) => assignment.team.status === stage);
+          if (!rows.length) return null;
+          return <div className="survival-column" key={stage}>
+            <h2>{stageName(stage)}</h2>
+            {rows.slice(0, 8).map((assignment) => <div className="survival-row" key={assignment.id}><span>{assignment.team.flag}</span><strong>{assignment.participant.name}</strong><em>{assignment.team.name}</em></div>)}
+            {rows.length > 8 && <small>+{rows.length - 8} more</small>}
+          </div>;
+        })}
+      </div>
+
+      <div className="ticker"><span>OFFICE SWEEPSTAKE LIVE</span><p>{tickerText(state)}</p></div>
+    </div>
+  </section>;
+}
+
 function AdminScreen({ state, action, refresh }) {
   async function patchTeam(id, patch) {
     await action(`/api/teams/${id}`, { method: "PATCH", body: patch });
@@ -274,8 +328,28 @@ function usePrizes(state) {
   }), [state.assignments]);
 }
 
+function impactHeadline(detail = "") {
+  const [teamPart, ownerPart = ""] = detail.split("|").map((part) => part.trim());
+  if (teamPart.includes("→ eliminated")) return `${ownerPart || "Someone"} just took a hit`;
+  if (teamPart.includes("→ winner")) return `${ownerPart || "Someone"} has won the sweepstake`;
+  if (teamPart.includes("→ runner-up")) return `${ownerPart || "Someone"} is in the €30 seat`;
+  if (teamPart.includes("→ semi") || teamPart.includes("→ quarter") || teamPart.includes("→ r16") || teamPart.includes("→ r32")) return `${ownerPart || "Someone"} survives another round`;
+  return teamPart || "Match impact updated";
+}
+
+function stageName(stage) {
+  return STAGES.find((item) => item.value === stage)?.label || stage;
+}
+
+function tickerText(state) {
+  const impacts = (state.audit || []).filter((event) => event.event === "Match impact").slice(0, 4).map((event) => event.detail);
+  if (impacts.length) return impacts.join("  •  ");
+  if (!state.draw) return "Registration is open. Add names, run the draw, then put this view on the office TV.";
+  return `${state.assignments?.length || 0} teams assigned. Update statuses after matches to generate live drama.`;
+}
+
 function labelForView(view) {
-  return { enter: "Enter", draw: "Draw", teams: "Teams", admin: "Admin" }[view];
+  return { enter: "Enter", draw: "Draw", teams: "Teams", tele: "Tele", admin: "Admin" }[view];
 }
 
 async function api(path, options = {}) {

@@ -21,6 +21,7 @@ Fun office sweepstake experience, not a dashboard:
 - exciting ticket-style entry flow
 - big reveal stage
 - public team board
+- Tele broadcast view for office screens
 - SQLite shared state
 - Windows-server-friendly Express app
 
@@ -34,8 +35,9 @@ Fun office sweepstake experience, not a dashboard:
 - Reveal-next and reveal-all persisted in SQLite.
 - Manual team status updates persisted in SQLite.
 - Reset endpoint.
+- Rich match-impact audit events on team status changes.
 - Modern React frontend.
-- Entry screen, reveal stage, team board, admin booth.
+- Entry screen, reveal stage, team board, Tele broadcast view, admin booth.
 - Existing draw tests still pass.
 
 ## Verification
@@ -49,6 +51,7 @@ Latest local gates:
   - add participants
   - create draw
   - reveal next
+  - status update creates Match impact event
   - serve built frontend
 
 ## Next Steps
