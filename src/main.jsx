@@ -25,6 +25,7 @@ function App() {
   const [adminAuthed, setAdminAuthed] = useState(false);
   const [error, setError] = useState("");
   const [toast, setToast] = useState(null);
+  const [registeredNotice, setRegisteredNotice] = useState(null);
 
   async function refresh() {
     try {
@@ -81,15 +82,16 @@ function App() {
       {isAdminRoute && <div className="nav-links"><span className="admin-route-pill">Admin console</span></div>}
     </nav>}
     {error && <div className="error-bar">{error}</div>}
-    {page === "enter" && <EnterPage state={state} action={action} setPage={setPage} />}
+    {page === "enter" && <EnterPage state={state} action={action} setPage={setPage} setRegisteredNotice={setRegisteredNotice} />}
     {page === "draw" && <DrawPage state={state} action={action} setPage={setPage} />}
     {page === "tele" && <TelePage state={state} />}
     {page === "admin" && <AdminGate authed={adminAuthed} setAuthed={setAdminAuthed} refresh={refresh}><AdminPage state={state} action={action} refresh={refresh} /></AdminGate>}
+    {registeredNotice && <RegistrationModal notice={registeredNotice} onClose={() => setRegisteredNotice(null)} onDraw={() => { setRegisteredNotice(null); setPage("draw"); }} />}
     {toast && <div className="success-toast">{toast}</div>}
   </div>;
 }
 
-function EnterPage({ state, action, setPage }) {
+function EnterPage({ state, action, setPage, setRegisteredNotice }) {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [department, setDepartment] = useState("");
@@ -118,8 +120,8 @@ function EnterPage({ state, action, setPage }) {
     if (!canJoin) return;
     const participant = await action("/api/participants", { method: "POST", body: { email, name, department } }, `${name} is in the draw!`);
     localStorage.setItem("wcs_participant", JSON.stringify({ id: participant.id, email, name: participant.name || name }));
+    setRegisteredNotice({ name: participant.name || name, email });
     setEmail(""); setName(""); setDepartment(""); setLookup(null);
-    setPage("draw");
   }
 
   return <main className="page">
@@ -161,6 +163,19 @@ function EnterPage({ state, action, setPage }) {
       <Info icon="🔐" title="Verified entry" desc={`${state.allowlist?.remaining || 0} eligible employees still not joined`} />
     </div>
   </main>;
+}
+
+function RegistrationModal({ notice, onClose, onDraw }) {
+  return <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Registration confirmed">
+    <div className="registered-modal">
+      <button className="modal-close" onClick={onClose} aria-label="Close">×</button>
+      <div className="registered-badge">✓</div>
+      <div className="registered-eyebrow">You’re registered</div>
+      <h2>{notice.name} is in the draw</h2>
+      <p>{notice.email} has been verified. Keep this browser open and the Draw page will know which teams are yours.</p>
+      <div className="btn-row center"><button className="btn btn-primary" onClick={onDraw}>Go to Draw stage →</button><button className="btn btn-ghost" onClick={onClose}>Stay here</button></div>
+    </div>
+  </div>;
 }
 
 function DrawPage({ state, action, setPage }) {
