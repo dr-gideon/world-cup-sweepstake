@@ -179,7 +179,7 @@ function RegistrationModal({ notice, onClose, onDraw }) {
       <div className="registered-badge">✓</div>
       <div className="registered-eyebrow">{notice.alreadyJoined ? "Already registered" : "You’re registered"}</div>
       <h2>{notice.name} is in the draw</h2>
-      <p>{notice.email} has been verified. {notice.alreadyJoined ? "You can head straight to the Draw page." : "Keep this browser open and the Draw page will know which teams are yours."}</p>
+      <p>{notice.email} has been verified. {notice.alreadyJoined ? "You can head straight to the Draw page." : "We’ll remember this browser for the draw. If you come back from another device, just enter this email again to find your teams."}</p>
       <div className="btn-row center"><button className="btn btn-primary" onClick={onDraw}>Go to Draw stage →</button><button className="btn btn-ghost" onClick={onClose}>Stay here</button></div>
     </div>
   </div>;
