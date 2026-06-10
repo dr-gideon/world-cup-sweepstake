@@ -202,3 +202,6 @@ a.btn { text-decoration:none; display:inline-flex; align-items:center; justify-c
 .team-crest { width:32px; height:32px; object-fit:contain; vertical-align:middle; display:inline-block; }
 .draw-card-flag .team-crest { width:44px; height:44px; }
 .survival-row .team-crest { width:24px; height:24px; }
+
+.admin-crest-cell { width:54px; min-height:38px; display:grid; place-items:center; border:1px solid rgba(255,255,255,.1); border-radius:8px; background:rgba(255,255,255,.04); overflow:hidden; }
+.admin-crest-cell .team-crest { width:28px; height:28px; }

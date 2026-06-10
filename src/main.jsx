@@ -360,7 +360,7 @@ function CsvPreview({ preview }) {
 
 function AdminTeamRow({ team, action }) {
   function patch(patchBody) { action(`/api/teams/${team.id}`, { method: "PATCH", body: patchBody }); }
-  return <div className="admin-team-row"><input className="admin-input flag" value={team.flag} onChange={(e) => patch({ flag: e.target.value })} /><input className="admin-input" value={team.name} onChange={(e) => patch({ name: e.target.value })} /><input className="admin-input" value={team.code} onChange={(e) => patch({ code: e.target.value })} /><select className="admin-select" value={team.pot} onChange={(e) => patch({ pot: Number(e.target.value) })}>{[1,2,3,4].map((pot) => <option key={pot} value={pot}>Pot {pot}</option>)}</select><select className="admin-select" value={team.status} onChange={(e) => patch({ status: e.target.value })}>{STAGES.map((stage) => <option key={stage.value} value={stage.value}>{stage.label}</option>)}</select></div>;
+  return <div className="admin-team-row"><div className="admin-crest-cell" title={team.flag}><TeamMark flag={team.flag} name={team.name} /></div><input className="admin-input" value={team.name} onChange={(e) => patch({ name: e.target.value })} /><input className="admin-input" value={team.code} onChange={(e) => patch({ code: e.target.value })} /><select className="admin-select" value={team.pot} onChange={(e) => patch({ pot: Number(e.target.value) })}>{[1,2,3,4].map((pot) => <option key={pot} value={pot}>Pot {pot}</option>)}</select><select className="admin-select" value={team.status} onChange={(e) => patch({ status: e.target.value })}>{STAGES.map((stage) => <option key={stage.value} value={stage.value}>{stage.label}</option>)}</select></div>;
 }
 
 function DrawCard({ assignment }) {
