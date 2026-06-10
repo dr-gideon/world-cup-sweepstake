@@ -4,6 +4,8 @@
 
 Project created. Planning / MVP definition stage.
 
+GitHub: https://github.com/dr-gideon/world-cup-sweepstake
+
 ## Current Direction
 
 Build a small polished web app for an office 2026 World Cup sweepstake:

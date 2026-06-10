@@ -1,15 +1,21 @@
 # Repository Setup
 
-Prepared GitHub repo name:
+GitHub repo:
 
 ```text
-world-cup-sweepstake
+https://github.com/dr-gideon/world-cup-sweepstake
 ```
 
-Suggested private repo command:
+Visibility: private.
 
-```bash
-gh repo create dr-gideon/world-cup-sweepstake --private --source=. --remote=origin --push
+Local project path:
+
+```text
+labs/projects/world-cup-sweepstake/
 ```
 
-Run this from `labs/projects/world-cup-sweepstake/` after approval.
+Remote:
+
+```text
+origin https://github.com/dr-gideon/world-cup-sweepstake.git
+```
