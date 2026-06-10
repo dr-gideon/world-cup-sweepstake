@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { CalendarDays, CheckCircle2, ClipboardList, Download, Flag, Play, RefreshCcw, ShieldCheck, Sparkles, Trophy, Upload, Users } from "lucide-react";
+import { ClipboardList, Download, Flag, Play, RefreshCcw, ShieldCheck, Sparkles, Trophy, Upload, Users } from "lucide-react";
 import { DEFAULT_TEAMS, STAGES } from "./teams.js";
 import { hydrateAssignments, normaliseParticipant, prizeWinners, runDraw } from "./draw.js";
 import "./styles.css";
@@ -69,11 +69,17 @@ function App() {
   }
 
   function toggleRegistration() {
-    update((current) => ({
-      ...current,
-      registrationOpen: !current.registrationOpen,
-      audit: [audit(!current.registrationOpen ? "Registration opened" : "Registration closed", "Admin action"), ...current.audit]
-    }));
+    update((current) => {
+      if (current.draw && !current.registrationOpen) {
+        alert("A draw already exists. Reset the sweepstake before re-opening registration.");
+        return current;
+      }
+      return {
+        ...current,
+        registrationOpen: !current.registrationOpen,
+        audit: [audit(!current.registrationOpen ? "Registration opened" : "Registration closed", "Admin action"), ...current.audit]
+      };
+    });
   }
 
   function executeDraw(seed) {
@@ -199,7 +205,7 @@ function App() {
         </header>
 
         {view === "dashboard" && <Dashboard state={state} assignments={assignments} prizes={prizes} aliveCount={aliveCount} setView={setView} />}
-        {view === "join" && <Join registrationOpen={state.registrationOpen} participants={state.participants} addParticipant={addParticipant} removeParticipant={removeParticipant} />}
+        {view === "join" && <Join registrationOpen={state.registrationOpen} drawLocked={Boolean(state.draw)} participants={state.participants} addParticipant={addParticipant} removeParticipant={removeParticipant} />}
         {view === "reveal" && <Reveal draw={state.draw} currentReveal={currentReveal} visibleAssignments={visibleAssignments} revealNext={revealNext} revealAll={revealAll} />}
         {view === "board" && <Board assignments={assignments} participants={state.participants} teams={state.teams} prizes={prizes} />}
         {view === "admin" && <Admin state={state} executeDraw={executeDraw} toggleRegistration={toggleRegistration} updateTeam={updateTeam} resetApp={resetApp} />}
@@ -243,12 +249,12 @@ function Dashboard({ state, assignments, prizes, aliveCount, setView }) {
   </section>;
 }
 
-function Join({ registrationOpen, participants, addParticipant, removeParticipant }) {
+function Join({ registrationOpen, drawLocked, participants, addParticipant, removeParticipant }) {
   const [name, setName] = useState("");
   const [department, setDepartment] = useState("");
   function submit(event) {
     event.preventDefault();
-    if (!registrationOpen || !name.trim()) return;
+    if (!registrationOpen || drawLocked || !name.trim()) return;
     addParticipant(name, department);
     setName("");
     setDepartment("");
@@ -257,16 +263,17 @@ function Join({ registrationOpen, participants, addParticipant, removeParticipan
     <form className="card join-card" onSubmit={submit}>
       <p className="eyebrow">Join the office draw</p>
       <h2>Free entry. CEO-sponsored prizes. Maximum bragging rights.</h2>
-      <label>Name<input value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Alex Murphy" disabled={!registrationOpen} /></label>
-      <label>Department <span>optional</span><input value={department} onChange={(event) => setDepartment(event.target.value)} placeholder="e.g. Sales" disabled={!registrationOpen} /></label>
-      <button className="primary-btn" disabled={!registrationOpen || !name.trim()}>Add me to the sweepstake</button>
-      {!registrationOpen && <p className="notice warning">Registration is closed. Ask the admin before editing participants.</p>}
+      <label>Name<input value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Alex Murphy" disabled={!registrationOpen || drawLocked} /></label>
+      <label>Department <span>optional</span><input value={department} onChange={(event) => setDepartment(event.target.value)} placeholder="e.g. Sales" disabled={!registrationOpen || drawLocked} /></label>
+      <button className="primary-btn" disabled={!registrationOpen || drawLocked || !name.trim()}>Add me to the sweepstake</button>
+      {!registrationOpen && !drawLocked && <p className="notice warning">Registration is closed. Ask the admin before editing participants.</p>}
+      {drawLocked && <p className="notice warning">The draw is locked. Reset the sweepstake before changing participants.</p>}
     </form>
     <div className="card">
       <div className="card-header"><div><p className="eyebrow">Participants</p><h3>{participants.length} joined</h3></div><StatusPill tone={participants.length ? "success" : "muted"} label={participants.length ? "Ready" : "Empty"} /></div>
       <div className="participant-list">
         {participants.length === 0 && <EmptyState title="No one has joined yet" detail="Add test participants here before running the draw." />}
-        {participants.map((participant) => <div className="participant-row" key={participant.id}><div><strong>{participant.name}</strong><span>{participant.department || "No department"}</span></div><button className="icon-btn" onClick={() => removeParticipant(participant.id)} aria-label={`Remove ${participant.name}`}>×</button></div>)}
+        {participants.map((participant) => <div className="participant-row" key={participant.id}><div><strong>{participant.name}</strong><span>{participant.department || "No department"}</span></div><button className="icon-btn" disabled={drawLocked} onClick={() => removeParticipant(participant.id)} aria-label={`Remove ${participant.name}`}>×</button></div>)}
       </div>
     </div>
   </section>;
@@ -328,11 +335,11 @@ function Admin({ state, executeDraw, toggleRegistration, updateTeam, resetApp })
     <div className="card admin-card">
       <div className="card-header"><div><p className="eyebrow">Draw controls</p><h2>Registration and draw</h2></div><StatusPill tone={state.registrationOpen ? "success" : "warning"} label={state.registrationOpen ? "Open" : "Closed"} /></div>
       <div className="control-grid">
-        <button className="secondary-btn" onClick={toggleRegistration}>{state.registrationOpen ? "Close registration" : "Re-open registration"}</button>
+        <button className="secondary-btn" disabled={Boolean(state.draw) && !state.registrationOpen} onClick={toggleRegistration}>{state.registrationOpen ? "Close registration" : "Re-open registration"}</button>
         <label>Draw seed<input value={seed} onChange={(event) => setSeed(event.target.value)} placeholder="Optional seed" /></label>
         <button className="primary-btn" disabled={state.participants.length === 0 || state.participants.length > 48} onClick={() => executeDraw(seed)}><RefreshCcw size={16} /> Run / re-run draw</button>
       </div>
-      <p className="notice info">Re-running the draw replaces current assignments. Export a backup first if this is a live office draw.</p>
+      <p className="notice info">Re-running the draw replaces current assignments. Export a backup first if this is a live office draw. Once a draw exists, participant edits are locked to protect the board.</p>
       {state.participants.length > 48 && <p className="notice warning">There are {state.participants.length} participants for 48 team slots. This MVP blocks the draw until extra entries are removed or shared-team rules are agreed.</p>}
     </div>
 
