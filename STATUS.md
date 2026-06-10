@@ -13,6 +13,22 @@ Prize rules:
 - Entry is free for all participants.
 - If one participant owns both finalists, they may win both prizes.
 
+## App Surfaces
+
+- `/` — public employee app. Shows only Enter and Draw.
+- `/tele` — standalone office TV view. No nav or admin controls.
+- `/admin` — protected admin console for organiser controls.
+
+Admin credentials are read from environment variables:
+
+```text
+ADMIN_USER=admin
+ADMIN_PASSWORD=change-me
+COOKIE_SECURE=1 # optional, use when served over HTTPS
+```
+
+If `ADMIN_PASSWORD` is not set, local preview uses the development password `sweepstake-admin`. Do not use that for office deployment.
+
 ## Current Build
 
 The original Resolve-dashboard MVP is archived as git tag:
@@ -21,8 +37,9 @@ The original Resolve-dashboard MVP is archived as git tag:
 mvp-resolve-dashboard-2026-06-10
 ```
 
-The current app keeps the Resolve colour influence but switches to a modern event-style experience:
+The current app uses the Claude-designed visual direction from `/home/giddy/temp/Resolve logo and icon/sweepstake.jsx`, wired into the real Express/SQLite backend:
 
+- Enterpryze/Resolve logo assets in `public/assets/`
 - “ticket” entry screen
 - animated draw-stage UI
 - exciting team reveal
@@ -103,6 +120,9 @@ Optional environment variables:
 ```text
 PORT=8097
 SWEEPSTAKE_DB=data/sweepstake.sqlite
+ADMIN_USER=admin
+ADMIN_PASSWORD=change-me
+COOKIE_SECURE=1
 ```
 
 On Windows, run the same commands in PowerShell after installing Node 22+.
@@ -160,3 +180,10 @@ Private GitHub repo:
 ```text
 https://github.com/dr-gideon/world-cup-sweepstake
 ```
+
+## Admin Auth
+
+- Env vars: `ADMIN_USER`, `ADMIN_PASSWORD`, optional `COOKIE_SECURE=1`.
+- Preview fallback password exists only when `ADMIN_PASSWORD` is unset: `sweepstake-admin`.
+- Admin-only APIs: allowlist upload, participant removal, team/status edits, draw, reveal, reset.
+- Public APIs: state, email lookup, registration, auth status/login/logout.

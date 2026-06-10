@@ -14,11 +14,15 @@ const STAGES = [
   { value: "eliminated", label: "Out" }
 ];
 
-const NAV = ["enter", "draw", "teams", "tele", "admin"];
+const PUBLIC_NAV = ["enter", "draw"];
 
 function App() {
-  const [page, setPage] = useState("enter");
+  const route = window.location.pathname;
+  const isTeleRoute = route === "/tele";
+  const isAdminRoute = route === "/admin";
+  const [page, setPage] = useState(isTeleRoute ? "tele" : isAdminRoute ? "admin" : "enter");
   const [state, setState] = useState(null);
+  const [adminAuthed, setAdminAuthed] = useState(false);
   const [error, setError] = useState("");
   const [toast, setToast] = useState(null);
 
@@ -32,7 +36,10 @@ function App() {
     }
   }
 
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => {
+    refresh();
+    if (isAdminRoute) api("/api/auth/status").then((data) => setAdminAuthed(Boolean(data.authenticated))).catch(() => setAdminAuthed(false));
+  }, []);
 
   function showToast(message) {
     setToast(message);
@@ -58,19 +65,19 @@ function App() {
 
   return <div className="app">
     <div className="ticker"><div className="ticker-inner">{repeatTickerItems(state).map((item, i) => <span key={i}>{item}<b> · </b></span>)}</div></div>
-    <nav>
-      <button className="nav-logo" onClick={() => setPage("enter")} aria-label="Home">
+    {!isTeleRoute && <nav>
+      <button className="nav-logo" onClick={() => isAdminRoute ? null : setPage("enter")} aria-label="Home">
         <span className="world-cup-mark" aria-hidden="true">🏆</span>
         <div><div className="nav-title">World Cup 2026</div><div className="nav-sub">Office Sweepstake</div></div>
       </button>
-      <div className="nav-links">{NAV.map((item) => <button key={item} className={`nav-link ${page === item ? "active" : ""}`} onClick={() => setPage(item)}>{label(item)}</button>)}</div>
-    </nav>
+      {!isAdminRoute && <div className="nav-links">{PUBLIC_NAV.map((item) => <button key={item} className={`nav-link ${page === item ? "active" : ""}`} onClick={() => setPage(item)}>{label(item)}</button>)}</div>}
+      {isAdminRoute && <div className="nav-links"><span className="admin-route-pill">Admin console</span></div>}
+    </nav>}
     {error && <div className="error-bar">{error}</div>}
     {page === "enter" && <EnterPage state={state} action={action} setPage={setPage} />}
     {page === "draw" && <DrawPage state={state} action={action} setPage={setPage} />}
-    {page === "teams" && <TeamsPage state={state} />}
     {page === "tele" && <TelePage state={state} />}
-    {page === "admin" && <AdminPage state={state} action={action} refresh={refresh} />}
+    {page === "admin" && <AdminGate authed={adminAuthed} setAuthed={setAdminAuthed} refresh={refresh}><AdminPage state={state} action={action} refresh={refresh} /></AdminGate>}
     {toast && <div className="success-toast">{toast}</div>}
   </div>;
 }
@@ -157,10 +164,10 @@ function DrawPage({ state, action, setPage }) {
     <h1 className="hero-title small">{state.draw ? "Teams revealed." : "Ready to draw?"}</h1>
     <p className="hero-body">{state.draw ? `${state.participants.length} players have been assigned teams. Reveal them one by one or jump to the board.` : "Once verified players have entered, run the draw to assign all 48 teams."}</p>
     <div className="btn-row draw-actions">
-      {!state.draw && <><input className="seed-input" value={seed} onChange={(e) => setSeed(e.target.value)} /><button className="btn btn-primary" disabled={!canDraw} onClick={() => action("/api/draw", { method: "POST", body: { seed } }, "Draw complete!")}>🎲 Run the draw ({state.participants.length})</button></>}
-      {state.draw && <><button className="btn btn-primary" onClick={() => action("/api/reveal-next", { method: "POST" }, "Next team revealed")}>Reveal next</button><button className="btn btn-ghost" onClick={() => action("/api/reveal-all", { method: "POST" }, "All teams revealed")}>Reveal all</button><button className="btn btn-ghost" onClick={() => setPage("teams")}>View leaderboard →</button></>}
+      {!state.draw && <p className="public-note">The organiser will run the draw from the admin console once registration is ready.</p>}
+      {state.draw && <p className="public-note">The draw is live. Reveals are controlled by the organiser.</p>}
     </div>
-    {state.draw ? <div className="draw-grid">{assignments.map((assignment) => <DrawCard key={assignment.id} assignment={assignment} />)}</div> : <Empty icon="🎲" title="Draw hasn't run yet" desc="Add participants on the Enter page, then come back and run it here." />}
+    {state.draw ? <div className="draw-grid">{assignments.map((assignment) => <DrawCard key={assignment.id} assignment={assignment} />)}</div> : <Empty icon="🎲" title="Draw hasn't run yet" desc="Enter with your work email, then watch this page when the organiser starts the reveal." />}
   </main>;
 }
 
@@ -192,6 +199,51 @@ function TelePage({ state }) {
   </main>;
 }
 
+function AdminGate({ authed, setAuthed, refresh, children }) {
+  const [username, setUsername] = useState("admin");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+
+  async function login(event) {
+    event.preventDefault();
+    setBusy(true);
+    setMessage("");
+    try {
+      await api("/api/auth/login", { method: "POST", body: { username, password } });
+      setAuthed(true);
+      await refresh();
+    } catch (err) {
+      setMessage(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function logout() {
+    await api("/api/auth/logout", { method: "POST" });
+    setAuthed(false);
+  }
+
+  if (!authed) {
+    return <main className="page admin-login-page">
+      <section className="entry-card admin-login-card">
+        <div className="entry-card-header"><div className="entry-card-eyebrow">Restricted</div><div className="entry-card-title">Admin Login</div><div className="entry-card-sub">Organiser controls only</div></div>
+        <form className="entry-card-body" onSubmit={login}>
+          <h3>Sign in to manage the draw</h3>
+          <p>Admin controls are separate from the employee-facing app.</p>
+          {message && <Notice tone="warn">{message}</Notice>}
+          <Field label="Username"><input className="form-input" value={username} onChange={(e) => setUsername(e.target.value)} /></Field>
+          <Field label="Password"><input className="form-input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
+          <button className="btn-enter" disabled={busy || !username || !password}>{busy ? "Signing in…" : "Sign in"}</button>
+        </form>
+      </section>
+    </main>;
+  }
+
+  return <>{children}<button className="admin-logout" onClick={logout}>Logout admin</button></>;
+}
+
 function AdminPage({ state, action, refresh }) {
   const [csvText, setCsvText] = useState("email,name,department\n");
   const [adminSearch, setAdminSearch] = useState("");
@@ -201,12 +253,22 @@ function AdminPage({ state, action, refresh }) {
   async function reset() { if (confirm("Reset participants, draw, and results? Employee list is kept.")) await action("/api/reset", { method: "POST" }, "Sweepstake reset"); }
   return <main className="page">
     <div className="teams-header"><div><div className="hero-eyebrow">Admin Booth</div><h1 className="hero-title small">Control room.</h1></div><div className="btn-row"><button className="btn btn-ghost" onClick={refresh}>Refresh</button><button className="btn btn-ghost danger" onClick={reset}>Reset</button></div></div>
+    <section className="admin-panel draw-control-panel"><div className="admin-panel-title">Draw controls</div><p className="admin-panel-sub">Only admin can run or reveal the draw. Employees can only watch Enter/Draw.</p><AdminDrawControls state={state} action={action} /></section>
     <div className="admin-grid">
       <section className="admin-panel"><div className="admin-panel-title">Employee email list</div><p className="admin-panel-sub">Upload CSV: email,name,department. Emails are not shown publicly.</p><div className="allowlist-stats"><b>{state.allowlist?.eligible || 0}</b><span>eligible</span><b>{state.allowlist?.joined || 0}</b><span>joined</span><b>{state.allowlist?.remaining || 0}</b><span>left</span></div><label className="file-upload">Choose CSV<input type="file" accept=".csv,text/csv" onChange={(e) => loadFile(e.target.files?.[0])} /></label><textarea className="csv-box" value={csvText} onChange={(e) => setCsvText(e.target.value)} /><button className="btn btn-primary full" disabled={Boolean(state.draw)} onClick={uploadCsv}>Upload employee list</button></section>
       <section className="admin-panel"><div className="admin-panel-title">Participants</div><p className="admin-panel-sub">Locked after draw.</p>{state.participants.map((p) => <div className="participant-chip" key={p.id}><div className="participant-avatar">{initials(p.name)}</div><div><div className="participant-name">{p.name}</div><div className="participant-dept">{p.department || "No department"}</div></div><button className="participant-delete" disabled={Boolean(state.draw)} onClick={() => action(`/api/participants/${p.id}`, { method: "DELETE" }, "Participant removed")}>×</button></div>)}{!state.participants.length && <Empty icon="👥" title="No participants" desc="Upload the employee list, then people can enter." />}</section>
     </div>
     <section className="admin-panel wide"><div className="teams-header"><div><div className="admin-panel-title">Teams and results</div><p className="admin-panel-sub">Rename qualifiers and update match status.</p></div><input className="search-input" placeholder="Search teams…" value={adminSearch} onChange={(e) => setAdminSearch(e.target.value)} /></div><div>{filteredTeams.map((team) => <AdminTeamRow key={team.id} team={team} action={action} />)}</div></section>
   </main>;
+}
+
+function AdminDrawControls({ state, action }) {
+  const [seed, setSeed] = useState("office-2026");
+  const canDraw = !state.draw && state.participants.length > 0 && state.participants.length <= 48;
+  return <div className="admin-draw-controls">
+    {!state.draw && <><input className="seed-input" value={seed} onChange={(e) => setSeed(e.target.value)} /><button className="btn btn-primary" disabled={!canDraw} onClick={() => action("/api/draw", { method: "POST", body: { seed } }, "Draw complete")}>Run draw ({state.participants.length})</button></>}
+    {state.draw && <><button className="btn btn-primary" onClick={() => action("/api/reveal-next", { method: "POST" }, "Next team revealed")}>Reveal next</button><button className="btn btn-ghost" onClick={() => action("/api/reveal-all", { method: "POST" }, "All teams revealed")}>Reveal all</button></>}
+  </div>;
 }
 
 function AdminTeamRow({ team, action }) {

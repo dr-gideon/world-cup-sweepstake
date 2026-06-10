@@ -160,3 +160,13 @@ nav { position:sticky; top:0; z-index:100; background:rgba(8,12,24,.92); backdro
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation:none!important; transition:none!important; } }
 @media (max-width: 920px) { .hero-layout,.admin-grid,.tele-hero,.tele-grid { grid-template-columns:1fr; } .draw-grid { grid-template-columns:repeat(2,1fr); } .info-strip { grid-template-columns:1fr; } .team-row { grid-template-columns:44px 1fr; } .team-code,.team-owner,.status-badge { grid-column:2; text-align:left; width:max-content; } .tele-top { grid-template-columns:1fr; text-align:center; } .tele-top span:last-child { text-align:center; } }
 @media (max-width: 640px) { nav { padding:12px 1rem; align-items:stretch; flex-direction:column; gap:10px; } .nav-links { margin-left:0; overflow-x:auto; } .page { padding:2rem 1rem; } .hero-title { font-size:clamp(3rem,18vw,5rem); } .draw-grid { grid-template-columns:1fr; } .admin-team-row { grid-template-columns:1fr; } .allowlist-stats { grid-template-columns:auto 1fr; } .btn,.btn-row>* { width:100%; } .search-input { width:100%; } }
+.admin-route-pill { display:inline-flex; align-items:center; min-height:34px; padding:0 14px; border-radius:999px; color:#080c18; background:var(--gold); font-size:12px; font-weight:900; letter-spacing:1px; text-transform:uppercase; }
+.admin-login-page { min-height:calc(100vh - 130px); display:grid; place-items:center; }
+.admin-login-card { width:min(430px, 100%); }
+.public-note { color:#888; font-weight:800; border:1px solid rgba(255,255,255,.08); background:rgba(255,255,255,.035); border-radius:12px; padding:14px 16px; }
+.draw-control-panel { margin-bottom:2rem; }
+.admin-draw-controls { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+.admin-draw-controls .seed-input { width:220px; }
+.admin-logout { position:fixed; right:18px; bottom:18px; z-index:999; border:1px solid rgba(255,255,255,.16); background:rgba(8,12,24,.88); color:#fff; border-radius:999px; padding:10px 14px; font-weight:900; box-shadow:0 12px 32px rgba(0,0,0,.28); }
+.admin-logout:hover { border-color:rgba(255,215,0,.42); color:var(--gold); }
+@media (max-width:640px) { .admin-draw-controls .seed-input { width:100%; max-width:none; } .admin-logout { position:static; margin:0 1rem 1rem auto; display:block; } }

@@ -13,6 +13,22 @@ Prize rules:
 - Entry is free for all participants.
 - If one participant owns both finalists, they may win both prizes.
 
+## App Surfaces
+
+- `/` — public employee app. Shows only Enter and Draw.
+- `/tele` — standalone office TV view. No nav or admin controls.
+- `/admin` — protected admin console for organiser controls.
+
+Admin credentials are read from environment variables:
+
+```text
+ADMIN_USER=admin
+ADMIN_PASSWORD=change-me
+COOKIE_SECURE=1 # optional, use when served over HTTPS
+```
+
+If `ADMIN_PASSWORD` is not set, local preview uses the development password `sweepstake-admin`. Do not use that for office deployment.
+
 ## Current Build
 
 The original Resolve-dashboard MVP is archived as git tag:
@@ -104,6 +120,9 @@ Optional environment variables:
 ```text
 PORT=8097
 SWEEPSTAKE_DB=data/sweepstake.sqlite
+ADMIN_USER=admin
+ADMIN_PASSWORD=change-me
+COOKIE_SECURE=1
 ```
 
 On Windows, run the same commands in PowerShell after installing Node 22+.

@@ -74,3 +74,10 @@ Rationale: The office needs fair one-entry-per-employee registration without Mic
 Decision: Archive the SQLite/allowlist/Tele build as `pre-claude-ui-sqlite-allowlist-2026-06-10`, then rebuild the frontend using the Claude-designed `sweepstake.jsx` visual direction and Resolve/Enterpryze logo assets from `/home/giddy/temp/Resolve logo and icon/`.
 
 Rationale: Dr. Wells preferred the Claude design. The rebuild keeps the production backend features while adopting the stronger dark/gold sports-event UI.
+
+
+## 2026-06-10 — Split app into public, Tele, and Admin surfaces
+
+Decision: Public employees use `/` and only see Enter/Draw. Tele runs standalone at `/tele` without nav/admin controls. Admin runs at `/admin` behind simple username/password cookie auth. Admin mutation APIs require authentication.
+
+Rationale: The office-facing app should not expose organiser controls. Hiding tabs is not security, so server-side API protection is required before real use.
