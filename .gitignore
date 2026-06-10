@@ -1,6 +1,8 @@
 node_modules/
 dist/
 build/
+data/*.sqlite
+data/*.sqlite-*
 .env
 .env.*
 !.env.example
