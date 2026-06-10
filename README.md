@@ -171,7 +171,9 @@ Rules:
 
 ## Match Data Provider Direction
 
-Current provider is manual SQLite entry via Admin. This gives Tele fixtures/results without paid API dependency. Future provider can sync into the same match table from API-Football, football-data.org, SportMonks, or another source.
+Current provider supports manual SQLite entry via Admin plus optional Football-Data sync. Football-Data sync reads `FOOTBALL_DATA_API_KEY`, defaults to competition `WC` and season `2026`, records rate-limit headers where provided, and skips API matches whose teams cannot be safely matched to local sweepstake team slots. Manual entry remains the fallback.
+
+Tele summaries can be generated from local state. If `OPENAI_API_KEY` is configured, the app uses it and caches the result in SQLite. Without an LLM key, it uses deterministic fallback copy.
 
 ## Operating Notes
 

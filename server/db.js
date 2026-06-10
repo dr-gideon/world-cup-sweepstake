@@ -72,10 +72,33 @@ export function initDb() {
       status TEXT NOT NULL DEFAULT 'scheduled',
       notes TEXT NOT NULL DEFAULT '',
       updated_at TEXT NOT NULL,
+      provider TEXT NOT NULL DEFAULT 'manual',
+      provider_match_id TEXT NOT NULL DEFAULT '',
       FOREIGN KEY(home_team_id) REFERENCES teams(id),
       FOREIGN KEY(away_team_id) REFERENCES teams(id)
     );
+
+    CREATE TABLE IF NOT EXISTS provider_sync (
+      provider TEXT PRIMARY KEY,
+      last_sync_at TEXT NOT NULL,
+      status TEXT NOT NULL,
+      message TEXT NOT NULL DEFAULT '',
+      requests_available INTEGER,
+      reset_seconds INTEGER,
+      imported INTEGER NOT NULL DEFAULT 0,
+      skipped INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS tele_summaries (
+      id TEXT PRIMARY KEY,
+      source_key TEXT NOT NULL UNIQUE,
+      headline TEXT NOT NULL,
+      body TEXT NOT NULL,
+      provider TEXT NOT NULL DEFAULT 'fallback',
+      created_at TEXT NOT NULL
+    );
   `);
+  ensureMatchProviderColumns();
   const count = db.prepare("SELECT COUNT(*) AS count FROM teams").get().count;
   if (count !== 48) {
     db.exec("DELETE FROM assignments; DELETE FROM draws; DELETE FROM teams;");
@@ -106,6 +129,8 @@ export function getState() {
   const auditEvents = db.prepare("SELECT at, event, detail FROM audit_events ORDER BY id DESC LIMIT 20").all();
   const allowlistStats = getAllowlistStats();
   const matches = getMatches();
+  const providerSync = getProviderSync();
+  const teleSummary = getLatestTeleSummary();
   return {
     registrationOpen: !draw,
     participants,
@@ -114,7 +139,9 @@ export function getState() {
     assignments,
     audit: auditEvents,
     allowlist: allowlistStats,
-    matches
+    matches,
+    providerSync,
+    teleSummary
   };
 }
 
@@ -221,7 +248,7 @@ export function getMatches() {
   return db.prepare(`
     SELECT
       m.id, m.stage, m.kickoff, m.home_team_id AS homeTeamId, m.away_team_id AS awayTeamId,
-      m.home_score AS homeScore, m.away_score AS awayScore, m.status, m.notes, m.updated_at AS updatedAt,
+      m.home_score AS homeScore, m.away_score AS awayScore, m.status, m.notes, m.updated_at AS updatedAt, m.provider, m.provider_match_id AS providerMatchId,
       ht.name AS homeName, ht.code AS homeCode, ht.flag AS homeFlag,
       at.name AS awayName, at.code AS awayCode, at.flag AS awayFlag
     FROM matches m
@@ -243,12 +270,13 @@ export function upsertMatch(payload) {
   const homeScore = payload.homeScore === "" || payload.homeScore === null || payload.homeScore === undefined ? null : Number(payload.homeScore);
   const awayScore = payload.awayScore === "" || payload.awayScore === null || payload.awayScore === undefined ? null : Number(payload.awayScore);
   db.prepare(`
-    INSERT INTO matches (id, stage, kickoff, home_team_id, away_team_id, home_score, away_score, status, notes, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO matches (id, stage, kickoff, home_team_id, away_team_id, home_score, away_score, status, notes, updated_at, provider, provider_match_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       stage = excluded.stage, kickoff = excluded.kickoff, home_team_id = excluded.home_team_id, away_team_id = excluded.away_team_id,
-      home_score = excluded.home_score, away_score = excluded.away_score, status = excluded.status, notes = excluded.notes, updated_at = excluded.updated_at
-  `).run(id, String(payload.stage || "Group").trim() || "Group", String(payload.kickoff || "").trim(), homeTeamId, awayTeamId, homeScore, awayScore, status, String(payload.notes || "").trim(), new Date().toISOString());
+      home_score = excluded.home_score, away_score = excluded.away_score, status = excluded.status, notes = excluded.notes, updated_at = excluded.updated_at,
+      provider = excluded.provider, provider_match_id = excluded.provider_match_id
+  `).run(id, String(payload.stage || "Group").trim() || "Group", String(payload.kickoff || "").trim(), homeTeamId, awayTeamId, homeScore, awayScore, status, String(payload.notes || "").trim(), new Date().toISOString(), payload.provider || "manual", payload.providerMatchId || "");
   audit("Match updated", `${home.flag} ${home.name} ${homeScore ?? "-"} — ${awayScore ?? "-"} ${away.flag} ${away.name} | ${status}`);
   return db.prepare("SELECT * FROM matches WHERE id = ?").get(id);
 }
@@ -257,6 +285,90 @@ export function removeMatch(id) {
   const result = db.prepare("DELETE FROM matches WHERE id = ?").run(id);
   if (!result.changes) throw httpError(404, "Match not found.");
   audit("Match removed", id);
+}
+
+export function syncFootballDataMatches(matches, throttling = {}) {
+  const teams = db.prepare("SELECT id, name, code, flag FROM teams").all();
+  let imported = 0;
+  let skipped = 0;
+  for (const match of matches || []) {
+    const homeTeam = mapFootballDataTeam(match.homeTeam, teams);
+    const awayTeam = mapFootballDataTeam(match.awayTeam, teams);
+    if (!homeTeam || !awayTeam) { skipped += 1; continue; }
+    upsertMatch({
+      id: `football-data-${match.id}`,
+      provider: "football-data",
+      providerMatchId: String(match.id),
+      stage: normaliseFootballStage(match.stage || match.group || "Group"),
+      kickoff: match.utcDate ? String(match.utcDate).slice(0, 16) : "",
+      homeTeamId: homeTeam.id,
+      awayTeamId: awayTeam.id,
+      homeScore: match.score?.fullTime?.home ?? match.score?.regularTime?.home ?? null,
+      awayScore: match.score?.fullTime?.away ?? match.score?.regularTime?.away ?? null,
+      status: normaliseFootballStatus(match.status),
+      notes: `Football-Data ${match.status || ""}`.trim()
+    });
+    imported += 1;
+  }
+  recordProviderSync("football-data", {
+    status: "ok",
+    message: `Imported ${imported}, skipped ${skipped}`,
+    requestsAvailable: throttling.requestsAvailable,
+    resetSeconds: throttling.resetSeconds,
+    imported,
+    skipped
+  });
+  return { imported, skipped };
+}
+
+export function recordProviderSync(provider, result) {
+  db.prepare(`
+    INSERT INTO provider_sync (provider, last_sync_at, status, message, requests_available, reset_seconds, imported, skipped)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(provider) DO UPDATE SET
+      last_sync_at = excluded.last_sync_at, status = excluded.status, message = excluded.message,
+      requests_available = excluded.requests_available, reset_seconds = excluded.reset_seconds,
+      imported = excluded.imported, skipped = excluded.skipped
+  `).run(provider, new Date().toISOString(), result.status || "ok", result.message || "", result.requestsAvailable ?? null, result.resetSeconds ?? null, result.imported || 0, result.skipped || 0);
+}
+
+export function getProviderSync() {
+  return db.prepare("SELECT provider, last_sync_at AS lastSyncAt, status, message, requests_available AS requestsAvailable, reset_seconds AS resetSeconds, imported, skipped FROM provider_sync ORDER BY provider ASC").all();
+}
+
+export function createTeleSummary({ sourceKey, headline, body, provider = "fallback" }) {
+  const id = crypto.randomUUID();
+  db.prepare(`
+    INSERT INTO tele_summaries (id, source_key, headline, body, provider, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(source_key) DO UPDATE SET headline = excluded.headline, body = excluded.body, provider = excluded.provider, created_at = excluded.created_at
+  `).run(id, sourceKey, headline, body, provider, new Date().toISOString());
+  return getLatestTeleSummary();
+}
+
+export function getLatestTeleSummary() {
+  return db.prepare("SELECT id, source_key AS sourceKey, headline, body, provider, created_at AS createdAt FROM tele_summaries ORDER BY created_at DESC LIMIT 1").get() || null;
+}
+
+function mapFootballDataTeam(apiTeam, teams) {
+  if (!apiTeam) return null;
+  const candidates = [apiTeam.tla, apiTeam.shortName, apiTeam.name].filter(Boolean).map(normaliseTeamText);
+  return teams.find((team) => candidates.includes(normaliseTeamText(team.code)) || candidates.includes(normaliseTeamText(team.name))) || null;
+}
+
+function normaliseTeamText(value) {
+  return String(value || "").toLowerCase().replace(/\b(cf|fc|afc|sc|club|national|team)\b/g, "").replace(/[^a-z0-9]/g, "").trim();
+}
+
+function normaliseFootballStatus(status) {
+  if (["IN_PLAY", "PAUSED", "EXTRA_TIME", "PENALTY_SHOOTOUT"].includes(status)) return "live";
+  if (status === "FINISHED" || status === "AWARDED") return "finished";
+  if (status === "POSTPONED" || status === "SUSPENDED" || status === "CANCELLED") return "postponed";
+  return "scheduled";
+}
+
+function normaliseFootballStage(stage) {
+  return String(stage || "Group").replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 export function importAllowlist(csvText) {
@@ -319,7 +431,7 @@ export function exportBackupJson() {
     teams: db.prepare("SELECT id, name, code, flag, pot, status, note FROM teams ORDER BY rowid ASC").all(),
     draws: db.prepare("SELECT id, seed, created_at AS createdAt, reveal_index AS revealIndex FROM draws ORDER BY created_at ASC").all(),
     assignments: db.prepare("SELECT id, draw_id AS drawId, team_id AS teamId, participant_id AS participantId, draw_index AS drawIndex, revealed FROM assignments ORDER BY draw_index ASC").all(),
-    matches: db.prepare("SELECT id, stage, kickoff, home_team_id AS homeTeamId, away_team_id AS awayTeamId, home_score AS homeScore, away_score AS awayScore, status, notes, updated_at AS updatedAt FROM matches ORDER BY updated_at ASC").all(),
+    matches: db.prepare("SELECT id, stage, kickoff, home_team_id AS homeTeamId, away_team_id AS awayTeamId, home_score AS homeScore, away_score AS awayScore, status, notes, updated_at AS updatedAt, provider, provider_match_id AS providerMatchId FROM matches ORDER BY updated_at ASC").all(),
     audit: db.prepare("SELECT at, event, detail FROM audit_events ORDER BY id ASC").all()
   };
 }
@@ -379,6 +491,12 @@ function parseCsv(text) {
   row.push(cell);
   if (row.some((v) => v.trim())) rows.push(row);
   return rows;
+}
+
+function ensureMatchProviderColumns() {
+  const columns = db.prepare("PRAGMA table_info(matches)").all().map((column) => column.name);
+  if (columns.length && !columns.includes("provider")) db.exec("ALTER TABLE matches ADD COLUMN provider TEXT NOT NULL DEFAULT 'manual'");
+  if (columns.length && !columns.includes("provider_match_id")) db.exec("ALTER TABLE matches ADD COLUMN provider_match_id TEXT NOT NULL DEFAULT ''");
 }
 
 function ensureParticipantEmailColumn() {

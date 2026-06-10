@@ -109,3 +109,10 @@ Rationale: Before real office use, the organiser needs a safe backup path, remin
 Decision: Validate deployment readiness from a clean clone and temp database before any real hosting decision.
 
 Rationale: This proves the production path works independent of the working tree and preview state. The dry-run passed install, build, start, surfaces, admin auth, 48-user allowlist/register/draw/reveal, match result, winner/runner-up, and exports.
+
+
+## 2026-06-10 — Add optional Football-Data sync and cached Tele summaries
+
+Decision: Use Football-Data as the first live football provider, behind an optional env-keyed sync endpoint. Record rate-limit response headers and skip imports where API teams cannot be confidently mapped to local sweepstake teams. Add cached Tele summaries with optional OpenAI-backed generation and deterministic fallback.
+
+Rationale: This adds the live-data/LLM path without making the app dependent on paid/API availability or risking corrupt match/team mappings while 2026 qualifiers are incomplete.

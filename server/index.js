@@ -2,7 +2,9 @@ import crypto from "node:crypto";
 import express from "express";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { addParticipant, createDraw, exportBackupJson, exportNotJoinedCsv, exportParticipantsCsv, getState, importAllowlist, initDb, lookupEmployee, removeMatch, removeParticipant, resetSweepstake, revealAll, revealNext, updateTeam, upsertMatch } from "./db.js";
+import { fetchFootballDataMatches } from "./football-data.js";
+import { buildTeleSummary } from "./tele-summary.js";
+import { addParticipant, createDraw, createTeleSummary, exportBackupJson, exportNotJoinedCsv, exportParticipantsCsv, getState, importAllowlist, initDb, lookupEmployee, recordProviderSync, removeMatch, removeParticipant, resetSweepstake, revealAll, revealNext, syncFootballDataMatches, updateTeam, upsertMatch } from "./db.js";
 
 const app = express();
 const port = Number(process.env.PORT || 8097);
@@ -51,6 +53,26 @@ app.patch("/api/teams/:id", requireAdmin, wrap((req, res) => { updateTeam(req.pa
 app.post("/api/draw", requireAdmin, wrap((req, res) => { createDraw(req.body?.seed); res.status(201).json(getState()); }));
 app.post("/api/reveal-next", requireAdmin, wrap((req, res) => { revealNext(); res.json(getState()); }));
 app.post("/api/reveal-all", requireAdmin, wrap((req, res) => { revealAll(); res.json(getState()); }));
+app.post("/api/providers/football-data/sync", requireAdmin, wrap(async (req, res) => {
+  const result = await fetchFootballDataMatches({
+    apiKey: process.env.FOOTBALL_DATA_API_KEY,
+    competition: process.env.FOOTBALL_DATA_COMPETITION || req.body?.competition || "WC",
+    season: process.env.FOOTBALL_DATA_SEASON || req.body?.season || "2026",
+    dateFrom: req.body?.dateFrom || "",
+    dateTo: req.body?.dateTo || ""
+  });
+  if (result.throttling.low) {
+    recordProviderSync("football-data", { status: "throttled", message: "Low Football-Data request budget; sync skipped.", requestsAvailable: result.throttling.requestsAvailable, resetSeconds: result.throttling.resetSeconds });
+    return res.status(429).json(getState());
+  }
+  syncFootballDataMatches(result.payload.matches || [], result.throttling);
+  res.json(getState());
+}));
+app.post("/api/tele-summary/generate", requireAdmin, wrap(async (req, res) => {
+  const summary = await buildTeleSummary({ state: getState(), openAiKey: process.env.OPENAI_API_KEY || "", model: process.env.OPENAI_MODEL || "gpt-4o-mini" });
+  createTeleSummary(summary);
+  res.json(getState());
+}));
 app.post("/api/matches", requireAdmin, wrap((req, res) => { upsertMatch(req.body || {}); res.status(201).json(getState()); }));
 app.patch("/api/matches/:id", requireAdmin, wrap((req, res) => { upsertMatch({ ...(req.body || {}), id: req.params.id }); res.json(getState()); }));
 app.delete("/api/matches/:id", requireAdmin, wrap((req, res) => { removeMatch(req.params.id); res.status(204).end(); }));

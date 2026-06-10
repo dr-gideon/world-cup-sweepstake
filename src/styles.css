@@ -193,3 +193,9 @@ nav { position:sticky; top:0; z-index:100; background:rgba(8,12,24,.92); backdro
 @media (max-width:1040px) { .match-form,.match-row,.tele-match { grid-template-columns:1fr; } .match-row strong,.tele-match strong { text-align:left; } }
 a.btn { text-decoration:none; display:inline-flex; align-items:center; justify-content:center; }
 .export-panel { margin-bottom:2rem; }
+.provider-grid { display:grid; grid-template-columns:90px 100px 150px 150px auto auto; gap:8px; align-items:center; }
+.provider-status { margin-top:12px; display:grid; gap:3px; padding:12px; border:1px solid rgba(255,255,255,.08); border-radius:10px; background:rgba(255,255,255,.035); }
+.provider-status b { color:#fff; }
+.provider-status span { color:#d1d5db; font-size:13px; }
+.provider-status em { color:#777; font-size:12px; font-style:normal; }
+@media (max-width:1040px) { .provider-grid { grid-template-columns:1fr; } }

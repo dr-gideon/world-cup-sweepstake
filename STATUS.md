@@ -219,3 +219,14 @@ A clean clone production-style dry-run passed on temp port `8108` with temp DB:
 ## Office Runbook
 
 - Added `docs/OFFICE-CHECKLIST.md`.
+
+## Football-Data / Tele Summary Layer
+
+- Added optional Football-Data provider sync endpoint.
+- Env vars: `FOOTBALL_DATA_API_KEY`, `FOOTBALL_DATA_COMPETITION=WC`, `FOOTBALL_DATA_SEASON=2026`.
+- Sync records provider status, imported/skipped counts, and rate-limit headers when available.
+- Sync safely skips API matches when both teams cannot be mapped to local team slots.
+- Added cached Tele summaries.
+- Env vars: `OPENAI_API_KEY`, optional `OPENAI_MODEL`.
+- Without LLM env, Tele summary generation falls back to deterministic local copy.
+- Live Football-Data smoke with temp key returned WC matches and safely skipped unmatched placeholder teams.
