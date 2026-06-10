@@ -322,18 +322,48 @@ function MatchAdmin({ state, action }) {
       <input className="admin-input" value={form.notes} onChange={(e) => update({ notes: e.target.value })} placeholder="Notes" />
       <button className="btn btn-primary" disabled={!form.homeTeamId || !form.awayTeamId || form.homeTeamId === form.awayTeamId} onClick={save}>Save match</button>
     </div>
-    <div className="match-list">{(state.matches || []).slice().reverse().map((match) => <div className="match-row" key={match.id}><span>{match.stage}</span><b>{flagText(match.homeFlag)} {match.homeName}</b><strong>{scoreText(match)}</strong><b>{flagText(match.awayFlag)} {match.awayName}</b><em>{match.status}</em><button className="participant-delete" onClick={() => action(`/api/matches/${match.id}`, { method: "DELETE" }, "Match removed")}>×</button></div>)}{!(state.matches || []).length && <Empty icon="⚽" title="No matches yet" desc="Add fixtures or results manually for Tele." />}</div>
+    <div className="match-list">{(state.matches || []).slice().reverse().map((match) => <div className="match-row" key={match.id}><span>{formatMatchDate(match.kickoff)}<small>{formatMatchTime(match.kickoff)}</small></span><b><TeamMark flag={match.homeFlag} name={match.homeName} /> {match.homeName}</b><strong>{scoreText(match)}</strong><b>{match.awayName} <TeamMark flag={match.awayFlag} name={match.awayName} /></b><em>{match.status}</em><button className="participant-delete" onClick={() => action(`/api/matches/${match.id}`, { method: "DELETE" }, "Match removed")}>×</button></div>)}{!(state.matches || []).length && <Empty icon="⚽" title="No matches yet" desc="Add fixtures or results manually for Tele." />}</div>
   </section>;
 }
 
 function TeleMatches({ matches }) {
-  const latest = matches.filter((m) => m.status === "live" || m.status === "finished").slice(-4).reverse();
-  const upcoming = matches.filter((m) => m.status === "scheduled").slice(0, 3);
-  const rows = latest.length ? latest : upcoming;
-  if (!rows.length) return <Empty icon="⚽" title="No fixtures yet" desc="Admin can add manual fixtures/results." />;
-  return <div className="tele-match-list">{rows.map((match) => <div className={`tele-match ${match.status}`} key={match.id}><span>{match.stage}</span><b>{flagText(match.homeFlag)} {match.homeCode}</b><strong>{scoreText(match)}</strong><b>{match.awayCode} {flagText(match.awayFlag)}</b><em>{match.status}</em></div>)}</div>;
+  const live = matches.filter((m) => m.status === "live").slice(0, 3);
+  const upcoming = matches.filter((m) => m.status === "scheduled").slice(0, 4);
+  const recent = matches.filter((m) => m.status === "finished").slice(-4).reverse();
+  if (!matches.length) return <Empty icon="⚽" title="No fixtures yet" desc="Admin can add manual fixtures/results or sync Football-Data." />;
+  return <div className="tele-fixtures">
+    <FixtureSection title="Live now" rows={live} empty="No live matches" />
+    <FixtureSection title="Next up" rows={upcoming} empty="No scheduled fixtures" />
+    <FixtureSection title="Recent results" rows={recent} empty="No results yet" />
+  </div>;
 }
 
+function FixtureSection({ title, rows, empty }) {
+  return <section className="fixture-section"><h3>{title}</h3>{rows.length ? rows.map((match) => <FixtureRow key={match.id} match={match} />) : <p>{empty}</p>}</section>;
+}
+
+function FixtureRow({ match }) {
+  return <div className={`fixture-row ${match.status}`}>
+    <div className="fixture-time"><b>{formatMatchDate(match.kickoff)}</b><span>{formatMatchTime(match.kickoff)}</span></div>
+    <div className="fixture-team"><TeamMark flag={match.homeFlag} name={match.homeName} /><strong>{match.homeCode}</strong></div>
+    <strong className="fixture-score">{scoreText(match)}</strong>
+    <div className="fixture-team away"><strong>{match.awayCode}</strong><TeamMark flag={match.awayFlag} name={match.awayName} /></div>
+    <em>{match.status}</em>
+  </div>;
+}
+
+function formatMatchDate(value) {
+  if (!value) return "TBD";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "TBD";
+  return new Intl.DateTimeFormat("en-IE", { day: "2-digit", month: "short" }).format(date);
+}
+function formatMatchTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-IE", { hour: "2-digit", minute: "2-digit" }).format(date);
+}
 function scoreText(match) {
   const home = match.homeScore ?? "-";
   const away = match.awayScore ?? "-";
