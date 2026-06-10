@@ -193,6 +193,7 @@ function DrawPage({ state, action, setPage }) {
   const [revealedTeams, setRevealedTeams] = useState({});
   const [spinning, setSpinning] = useState(false);
   const [spinIndex, setSpinIndex] = useState(0);
+  const [showBoard, setShowBoard] = useState(false);
   const remembered = readRememberedParticipant();
   const personalAssignments = lookup?.assignments?.length ? lookup.assignments : remembered?.id ? assignments.filter((assignment) => assignment.participant.id === remembered.id) : [];
   const current = personalAssignments[revealIndex] || personalAssignments[0];
@@ -235,7 +236,7 @@ function DrawPage({ state, action, setPage }) {
 
     {!state.draw && <Empty icon="🎲" title="Draw hasn't run yet" desc="Enter with your work email, then come back when the organiser starts the draw." />}
 
-    {state.draw && <section className="personal-reveal-layout">
+    {state.draw && <section className="personal-reveal-layout centered">
       <div className="reveal-card-stage">
         {personalAssignments.length ? <>
           <div className="reveal-count">Team {revealIndex + 1} of {personalAssignments.length}</div>
@@ -261,14 +262,9 @@ function DrawPage({ state, action, setPage }) {
           <div className="btn-row center">{!isCurrentRevealed ? <button className="btn btn-primary" disabled={spinning} onClick={startReveal}>{spinning ? "Revealing…" : "Reveal my team"}</button> : <><button className="btn btn-primary" disabled={revealIndex >= personalAssignments.length - 1} onClick={nextReveal}>Next team →</button><button className="btn btn-ghost" onClick={() => { setRevealedTeams({}); setRevealIndex(0); }}>Start again</button></>}</div>
         </> : <div className="entry-card find-card"><div className="entry-card-header"><div className="entry-card-eyebrow">Find my draw</div><div className="entry-card-title">Enter your email</div><div className="entry-card-sub">Same work email used to join</div></div><form className="entry-card-body" onSubmit={findTeams}><p>This browser does not know who entered. Type your work email to reveal your teams.</p>{lookup && !lookup.found && <Notice tone="warn">No draw entry found for that email.</Notice>}<Field label="Work email"><input className="form-input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@company.com" /></Field><button className="btn-enter" disabled={!email.trim()}>Find my teams</button></form></div>}
       </div>
-
-      <aside className="my-teams-panel">
-        <h3>My teams</h3>
-        {personalAssignments.length ? personalAssignments.map((assignment, index) => <button key={assignment.id} className={`my-team-row ${index === revealIndex ? "active" : ""}`} onClick={() => setRevealIndex(index)}><TeamMark flag={assignment.team.flag} name={assignment.team.name} /><span>{assignment.team.name}</span><em>Pot {assignment.team.pot}</em></button>) : <p>Find your entry to show your assigned teams.</p>}
-      </aside>
     </section>}
 
-    {state.draw && <section className="full-board"><div className="section-label">Full draw board</div><div className="draw-grid compact">{assignments.map((assignment) => <DrawCard key={assignment.id} assignment={assignment} />)}</div></section>}
+    {state.draw && <section className="full-board collapsed-board"><button className="board-toggle" onClick={() => setShowBoard((show) => !show)}><span>{showBoard ? "Hide full draw board" : "Show full draw board"}</span><em>{assignments.length} teams assigned</em></button>{showBoard && <div className="draw-grid compact">{assignments.map((assignment) => <DrawCard key={assignment.id} assignment={assignment} />)}</div>}</section>}
   </main>;
 }
 

@@ -266,3 +266,11 @@ a.btn { text-decoration:none; display:inline-flex; align-items:center; justify-c
 @keyframes cardPulse { from { transform:scale(.995); box-shadow:0 30px 110px rgba(0,0,0,.45), 0 0 70px rgba(255,215,0,.08); } to { transform:scale(1.01); box-shadow:0 34px 130px rgba(0,0,0,.5), 0 0 110px rgba(255,215,0,.18); } }
 @keyframes flagPop { from { transform:scale(.94) rotate(-2deg); } to { transform:scale(1.04) rotate(2deg); } }
 @media (prefers-reduced-motion: reduce) { .reveal-card.spinning, .spin-crest { animation:none; } }
+.personal-reveal-layout.centered { grid-template-columns:minmax(0,980px); justify-content:center; }
+.personal-reveal-layout.centered .reveal-card-stage { width:100%; }
+.collapsed-board { max-width:1180px; margin-left:auto; margin-right:auto; }
+.board-toggle { width:100%; display:flex; justify-content:space-between; align-items:center; gap:14px; padding:18px 20px; border-radius:18px; border:1px solid rgba(255,215,0,.22); background:rgba(255,255,255,.035); color:#fff; text-align:left; }
+.board-toggle span { color:var(--gold); font-weight:1000; text-transform:uppercase; letter-spacing:2px; font-size:13px; }
+.board-toggle em { color:#83899a; font-style:normal; font-size:13px; }
+.board-toggle:hover { background:rgba(255,215,0,.07); border-color:rgba(255,215,0,.4); }
+@media (max-width:620px) { .board-toggle { align-items:flex-start; flex-direction:column; } }
