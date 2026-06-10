@@ -59,7 +59,7 @@ The current app uses the Claude-designed visual direction from `/home/giddy/temp
 - Draw blocked if more than 48 people join until shared-team rules are agreed.
 - One-by-one reveal and reveal-all mode.
 - Public team board.
-- Tele view with post-match headline, drama feed, survival board, prize race, and ticker.
+- Tele view for office TV: fixtures/results plus sarcastic cached drama feed.
 - Editable qualifier team slots.
 - Manual tournament status updates.
 - Prize tracker for winner and runner-up.
@@ -176,7 +176,7 @@ Current provider is manual SQLite entry via Admin. This gives Tele fixtures/resu
 - Once a draw exists, participant edits are locked.
 - Reset the sweepstake if the participant list needs to change after a draw.
 - 2026 qualifiers are not all final yet, so most team slots are editable placeholders.
-- No paid sports API or LLM is wired yet.
+- Football-Data sync and OpenRouter Tele drama are wired via environment variables; no secrets are committed.
 
 ## Repository
 
@@ -255,3 +255,16 @@ A clean clone production-style dry-run passed on temp port `8108` with temp DB:
 - Tele drama feed now prefers cached summaries, then falls back to Match impact events.
 - Manual `Generate Tele summary` works with OpenRouter/OpenAI/fallback.
 - OpenRouter smoke with temp key succeeded; key not committed.
+
+
+## End-of-day state — 2026-06-10
+
+- Main branch is pushed and clean through `27d0dd6 Polish provider admin controls`.
+- Local preview on `http://100.86.180.12:8097/` was restarted and verified.
+- Windows dry run worked after pulling latest, building, setting env vars, and restarting NSSM service.
+- Dr. Wells reset the Windows SQLite DB by deleting `C:\Apps\world-cup-sweepstake\data\sweepstake.sqlite*`, wiping test employees/data.
+- Current public flow: employee enters via allowlist email, gets centered registration confirmation, browser remembers participant, Draw can also find teams by email, and personal team reveal animates through flags before showing assignment.
+- Current Tele flow: office TV shows only fixtures/results and the drama feed; alive/survival/prize clutter removed. Drama prompt is intentionally sarcastic/funny but office-safe.
+- Current Admin flow: protected `/admin`, clean Football-Data/Tele controls, provider status cards, match sync/import teams, cached Tele summary generation, auto-sync status.
+- Important env vars for Windows: `FOOTBALL_DATA_API_KEY`, `FOOTBALL_DATA_AUTO_SYNC=1`, `FOOTBALL_DATA_SYNC_INTERVAL_MINUTES=15`, `FOOTBALL_DATA_COMPETITION=WC`, `FOOTBALL_DATA_SEASON=2026`, `OPENROUTER_API_KEY`, `OPENROUTER_MODEL=openai/gpt-4o-mini`, `ADMIN_USER`, `ADMIN_PASSWORD`, `COOKIE_SECURE=0`.
+- Next sensible step: upload the real employee CSV on Windows, import teams, sync matches, do a final admin/Tele smoke, then share the public URL internally.

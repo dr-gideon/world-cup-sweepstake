@@ -137,3 +137,14 @@ Rationale: Tele should update without manual sync during the tournament, but gro
 Decision: Support `OPENROUTER_API_KEY` as the primary LLM path for Tele drama summaries, with OpenAI and deterministic fallback remaining available. Cache summaries by match/result source key.
 
 Rationale: Dr. Wells provided an OpenRouter key and wants group-stage match results to feed Tele drama. Caching avoids repeated LLM calls on every Tele refresh or sync.
+
+
+## 2026-06-10 — Final office-TV/product direction
+
+Decision: Tele should be a simple office TV surface showing fixtures/results and a sarcastic drama feed only. Remove survival/alive/prize clutter from `/tele`.
+
+Rationale: Dr. Wells wants people to glance at scores and laugh at the drama feed; extra tournament/admin state distracts from that use case.
+
+Decision: Draw should be personal and animated, but the full draw board should be collapsed by default.
+
+Rationale: The employee journey should focus on “what team did I get?” with drama. The full board is useful secondary information, not the main moment.
