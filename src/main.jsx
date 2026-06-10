@@ -41,6 +41,13 @@ function App() {
     if (isAdminRoute) api("/api/auth/status").then((data) => setAdminAuthed(Boolean(data.authenticated))).catch(() => setAdminAuthed(false));
   }, []);
 
+  useEffect(() => {
+    const intervalMs = isTeleRoute ? 10000 : isAdminRoute ? 0 : 7000;
+    if (!intervalMs) return undefined;
+    const id = setInterval(() => refresh(), intervalMs);
+    return () => clearInterval(id);
+  }, [isTeleRoute, isAdminRoute]);
+
   function showToast(message) {
     setToast(message);
     setTimeout(() => setToast(null), 3000);
@@ -247,15 +254,30 @@ function AdminGate({ authed, setAuthed, refresh, children }) {
 function AdminPage({ state, action, refresh }) {
   const [csvText, setCsvText] = useState("email,name,department\n");
   const [adminSearch, setAdminSearch] = useState("");
+  const csvPreview = useMemo(() => validateEmployeeCsv(csvText), [csvText]);
   const filteredTeams = state.teams.filter((team) => `${team.name} ${team.code}`.toLowerCase().includes(adminSearch.toLowerCase()));
-  async function uploadCsv() { await action("/api/allowlist", { method: "POST", text: csvText, contentType: "text/csv" }, "Employee list uploaded"); await refresh(); }
+  async function uploadCsv() {
+    if (!csvPreview.valid.length) throw new Error("CSV has no valid employee emails.");
+    await action("/api/allowlist", { method: "POST", text: csvText, contentType: "text/csv" }, "Employee list uploaded");
+    await refresh();
+  }
+  function downloadTemplate() {
+    const template = "email,name,department\nalice@company.com,Alice Murphy,Sales\nbob@company.com,Bob Lee,Support\n";
+    const blob = new Blob([template], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "world-cup-sweepstake-employees.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
   function loadFile(file) { if (!file) return; const reader = new FileReader(); reader.onload = () => setCsvText(String(reader.result || "")); reader.readAsText(file); }
   async function reset() { if (confirm("Reset participants, draw, and results? Employee list is kept.")) await action("/api/reset", { method: "POST" }, "Sweepstake reset"); }
   return <main className="page">
     <div className="teams-header"><div><div className="hero-eyebrow">Admin Booth</div><h1 className="hero-title small">Control room.</h1></div><div className="btn-row"><button className="btn btn-ghost" onClick={refresh}>Refresh</button><button className="btn btn-ghost danger" onClick={reset}>Reset</button></div></div>
     <section className="admin-panel draw-control-panel"><div className="admin-panel-title">Draw controls</div><p className="admin-panel-sub">Only admin can run or reveal the draw. Employees can only watch Enter/Draw.</p><AdminDrawControls state={state} action={action} /></section>
     <div className="admin-grid">
-      <section className="admin-panel"><div className="admin-panel-title">Employee email list</div><p className="admin-panel-sub">Upload CSV: email,name,department. Emails are not shown publicly.</p><div className="allowlist-stats"><b>{state.allowlist?.eligible || 0}</b><span>eligible</span><b>{state.allowlist?.joined || 0}</b><span>joined</span><b>{state.allowlist?.remaining || 0}</b><span>left</span></div><label className="file-upload">Choose CSV<input type="file" accept=".csv,text/csv" onChange={(e) => loadFile(e.target.files?.[0])} /></label><textarea className="csv-box" value={csvText} onChange={(e) => setCsvText(e.target.value)} /><button className="btn btn-primary full" disabled={Boolean(state.draw)} onClick={uploadCsv}>Upload employee list</button></section>
+      <section className="admin-panel"><div className="admin-panel-title">Employee email list</div><p className="admin-panel-sub">Upload CSV: email,name,department. Emails are not shown publicly.</p><div className="allowlist-stats"><b>{state.allowlist?.eligible || 0}</b><span>eligible</span><b>{state.allowlist?.joined || 0}</b><span>joined</span><b>{state.allowlist?.remaining || 0}</b><span>left</span></div><div className="btn-row csv-actions"><button className="btn btn-ghost" onClick={downloadTemplate}>Download template</button><label className="file-upload">Choose CSV<input type="file" accept=".csv,text/csv" onChange={(e) => loadFile(e.target.files?.[0])} /></label></div><textarea className="csv-box" value={csvText} onChange={(e) => setCsvText(e.target.value)} /><CsvPreview preview={csvPreview} /><button className="btn btn-primary full" disabled={Boolean(state.draw) || !csvPreview.valid.length} onClick={uploadCsv}>Upload {csvPreview.valid.length || ""} employee{csvPreview.valid.length === 1 ? "" : "s"}</button></section>
       <section className="admin-panel"><div className="admin-panel-title">Participants</div><p className="admin-panel-sub">Locked after draw.</p>{state.participants.map((p) => <div className="participant-chip" key={p.id}><div className="participant-avatar">{initials(p.name)}</div><div><div className="participant-name">{p.name}</div><div className="participant-dept">{p.department || "No department"}</div></div><button className="participant-delete" disabled={Boolean(state.draw)} onClick={() => action(`/api/participants/${p.id}`, { method: "DELETE" }, "Participant removed")}>×</button></div>)}{!state.participants.length && <Empty icon="👥" title="No participants" desc="Upload the employee list, then people can enter." />}</section>
     </div>
     <section className="admin-panel wide"><div className="teams-header"><div><div className="admin-panel-title">Teams and results</div><p className="admin-panel-sub">Rename qualifiers and update match status.</p></div><input className="search-input" placeholder="Search teams…" value={adminSearch} onChange={(e) => setAdminSearch(e.target.value)} /></div><div>{filteredTeams.map((team) => <AdminTeamRow key={team.id} team={team} action={action} />)}</div></section>
@@ -268,6 +290,15 @@ function AdminDrawControls({ state, action }) {
   return <div className="admin-draw-controls">
     {!state.draw && <><input className="seed-input" value={seed} onChange={(e) => setSeed(e.target.value)} /><button className="btn btn-primary" disabled={!canDraw} onClick={() => action("/api/draw", { method: "POST", body: { seed } }, "Draw complete")}>Run draw ({state.participants.length})</button></>}
     {state.draw && <><button className="btn btn-primary" onClick={() => action("/api/reveal-next", { method: "POST" }, "Next team revealed")}>Reveal next</button><button className="btn btn-ghost" onClick={() => action("/api/reveal-all", { method: "POST" }, "All teams revealed")}>Reveal all</button></>}
+  </div>;
+}
+
+function CsvPreview({ preview }) {
+  return <div className="csv-preview">
+    <div><b>{preview.valid.length}</b><span>valid</span></div>
+    <div><b>{preview.duplicates.length}</b><span>duplicates</span></div>
+    <div><b>{preview.invalid.length}</b><span>invalid</span></div>
+    {(preview.duplicates.length > 0 || preview.invalid.length > 0) && <p>{preview.duplicates.length ? `Duplicates ignored: ${preview.duplicates.slice(0, 3).join(", ")}${preview.duplicates.length > 3 ? "…" : ""}. ` : ""}{preview.invalid.length ? `Invalid rows: ${preview.invalid.slice(0, 3).join(", ")}${preview.invalid.length > 3 ? "…" : ""}.` : ""}</p>}
   </div>;
 }
 
@@ -301,6 +332,40 @@ function Splash({ text }) { return <div className="app splash"><div className="e
 
 function usePrizes(state) { return useMemo(() => ({ winner: state.assignments?.find((a) => a.team.status === "winner") || null, runnerUp: state.assignments?.find((a) => a.team.status === "runner-up") || null }), [state.assignments]); }
 function tickerItems(state) { return ["FREE ENTRY", "€80 PRIZE POT", `${state.participants.length} PLAYERS`, `${state.allowlist?.remaining || 0} NOT JOINED`, "OFFICE GLORY AWAITS"]; }
+function validateEmployeeCsv(text) {
+  const rows = parseCsv(text);
+  const headers = (rows[0] || []).map((h) => h.trim().toLowerCase());
+  const emailIndex = headers.indexOf("email");
+  const nameIndex = headers.indexOf("name");
+  const departmentIndex = headers.indexOf("department");
+  const seen = new Set();
+  const valid = [];
+  const duplicates = [];
+  const invalid = [];
+  if (emailIndex === -1) return { valid, duplicates, invalid: rows.length ? ["missing email column"] : [] };
+  rows.slice(1).forEach((row, index) => {
+    const email = String(row[emailIndex] || "").trim().toLowerCase();
+    if (!/^\S+@\S+\.\S+$/.test(email)) { invalid.push(`row ${index + 2}`); return; }
+    if (seen.has(email)) { duplicates.push(email); return; }
+    seen.add(email);
+    valid.push({ email, name: row[nameIndex] || "", department: row[departmentIndex] || "" });
+  });
+  return { valid, duplicates, invalid };
+}
+function parseCsv(text) {
+  const rows = []; let row = []; let cell = ""; let quoted = false;
+  const input = String(text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  for (let i = 0; i < input.length; i += 1) {
+    const char = input[i]; const next = input[i + 1];
+    if (char === '"' && quoted && next === '"') { cell += '"'; i += 1; continue; }
+    if (char === '"') { quoted = !quoted; continue; }
+    if (char === ',' && !quoted) { row.push(cell); cell = ""; continue; }
+    if (char === "\n" && !quoted) { row.push(cell); if (row.some((v) => v.trim())) rows.push(row); row = []; cell = ""; continue; }
+    cell += char;
+  }
+  row.push(cell); if (row.some((v) => v.trim())) rows.push(row);
+  return rows;
+}
 function repeatTickerItems(state) { return Array.from({ length: 8 }, () => tickerItems(state)).flat(); }
 function label(view) { return { enter: "Enter", draw: "Draw", teams: "Teams", tele: "Tele", admin: "Admin" }[view]; }
 function stageLabel(value) { return STAGES.find((stage) => stage.value === value)?.label || value; }

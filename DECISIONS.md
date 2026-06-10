@@ -81,3 +81,10 @@ Rationale: Dr. Wells preferred the Claude design. The rebuild keeps the producti
 Decision: Public employees use `/` and only see Enter/Draw. Tele runs standalone at `/tele` without nav/admin controls. Admin runs at `/admin` behind simple username/password cookie auth. Admin mutation APIs require authentication.
 
 Rationale: The office-facing app should not expose organiser controls. Hiding tabs is not security, so server-side API protection is required before real use.
+
+
+## 2026-06-10 — Operational polish before LLM Tele summaries
+
+Decision: Prioritize admin password hardening, CSV template/validation UX, and public/Tele auto-refresh before wiring LLM summaries.
+
+Rationale: The app needs reliable office operation before adding AI-generated copy. Admin password is now required via env var; public/Tele displays refresh automatically; CSV upload is easier to validate before import.

@@ -10,7 +10,12 @@ const distPath = resolve("dist");
 const indexPath = resolve(distPath, "index.html");
 const sessions = new Map();
 const adminUser = process.env.ADMIN_USER || "admin";
-const adminPassword = process.env.ADMIN_PASSWORD || "sweepstake-admin";
+const adminPassword = process.env.ADMIN_PASSWORD;
+
+if (!adminPassword) {
+  console.error("ADMIN_PASSWORD is required. Set a strong admin password before starting the server.");
+  process.exit(1);
+}
 
 initDb();
 app.use(express.json({ limit: "1mb" }));
@@ -62,7 +67,6 @@ app.use((err, req, res, next) => {
 
 app.listen(port, "0.0.0.0", () => {
   console.log(`World Cup Sweepstake server listening on http://0.0.0.0:${port}`);
-  if (!process.env.ADMIN_PASSWORD) console.log("Admin preview password is using development default: sweepstake-admin");
 });
 
 function requireAdmin(req, res, next) {

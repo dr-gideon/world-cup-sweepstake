@@ -15,8 +15,8 @@ Prize rules:
 
 ## App Surfaces
 
-- `/` — public employee app. Shows only Enter and Draw.
-- `/tele` — standalone office TV view. No nav or admin controls.
+- `/` — public employee app. Shows only Enter and Draw. Auto-refreshes every 7 seconds.
+- `/tele` — standalone office TV view. No nav or admin controls. Auto-refreshes every 10 seconds.
 - `/admin` — protected admin console for organiser controls.
 
 Admin credentials are read from environment variables:
@@ -27,7 +27,7 @@ ADMIN_PASSWORD=change-me
 COOKIE_SECURE=1 # optional, use when served over HTTPS
 ```
 
-If `ADMIN_PASSWORD` is not set, local preview uses the development password `sweepstake-admin`. Do not use that for office deployment.
+`ADMIN_PASSWORD` is required to start the server. Do not commit it or store it in plaintext project files.
 
 ## Current Build
 
@@ -160,6 +160,7 @@ Rules:
 - `email` is required.
 - `name` and `department` are optional but recommended.
 - emails are normalized to lowercase.
+- admin UI previews valid, duplicate, and invalid rows before upload.
 - duplicate emails in the CSV are ignored after the first valid row.
 - uploading a new CSV before the draw replaces the previous allowlist and clears current participants.
 - after the draw, the allowlist cannot be replaced unless the sweepstake is reset.
@@ -181,9 +182,8 @@ Private GitHub repo:
 https://github.com/dr-gideon/world-cup-sweepstake
 ```
 
-## Admin Auth
+## CSV UX
 
-- Env vars: `ADMIN_USER`, `ADMIN_PASSWORD`, optional `COOKIE_SECURE=1`.
-- Preview fallback password exists only when `ADMIN_PASSWORD` is unset: `sweepstake-admin`.
-- Admin-only APIs: allowlist upload, participant removal, team/status edits, draw, reveal, reset.
-- Public APIs: state, email lookup, registration, auth status/login/logout.
+- Admin can download a sample employee CSV template.
+- Admin UI previews valid, duplicate, and invalid rows before upload.
+- Upload button is disabled when no valid employee emails are present.

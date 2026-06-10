@@ -170,3 +170,11 @@ nav { position:sticky; top:0; z-index:100; background:rgba(8,12,24,.92); backdro
 .admin-logout { position:fixed; right:18px; bottom:18px; z-index:999; border:1px solid rgba(255,255,255,.16); background:rgba(8,12,24,.88); color:#fff; border-radius:999px; padding:10px 14px; font-weight:900; box-shadow:0 12px 32px rgba(0,0,0,.28); }
 .admin-logout:hover { border-color:rgba(255,215,0,.42); color:var(--gold); }
 @media (max-width:640px) { .admin-draw-controls .seed-input { width:100%; max-width:none; } .admin-logout { position:static; margin:0 1rem 1rem auto; display:block; } }
+.csv-actions { gap:10px; margin:12px 0; }
+.csv-actions .file-upload { flex:1; margin:0; min-width:160px; }
+.csv-preview { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:0 0 12px; }
+.csv-preview div { border:1px solid rgba(255,255,255,.08); border-radius:10px; background:rgba(255,255,255,.035); padding:10px; text-align:center; }
+.csv-preview b { display:block; color:#fff; font-size:22px; line-height:1; }
+.csv-preview span { color:#666; font-size:10px; font-weight:900; text-transform:uppercase; letter-spacing:1px; }
+.csv-preview p { grid-column:1 / -1; color:#fde68a; background:rgba(255,215,0,.08); border:1px solid rgba(255,215,0,.18); border-radius:10px; padding:10px; font-size:12px; line-height:1.4; }
+@media (max-width:640px) { .csv-preview { grid-template-columns:1fr; } }

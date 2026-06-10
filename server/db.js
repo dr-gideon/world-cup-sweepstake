@@ -258,7 +258,8 @@ function getAllowlistStats() {
 }
 
 function normaliseEmail(value) {
-  return String(value || "").trim().toLowerCase();
+  const email = String(value || "").trim().toLowerCase();
+  return /^\S+@\S+\.\S+$/.test(email) ? email : "";
 }
 
 function parseCsv(text) {
