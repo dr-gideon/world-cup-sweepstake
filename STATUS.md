@@ -199,3 +199,23 @@ https://github.com/dr-gideon/world-cup-sweepstake
 - Admin exports: full JSON backup, not-joined CSV, participants CSV.
 - Export endpoints require admin auth.
 - Smoke test confirmed unauthenticated export returns 401 and authenticated exports contain expected data.
+
+## Production Dry-run
+
+A clean clone production-style dry-run passed on temp port `8108` with temp DB:
+
+- `npm ci`
+- `npm run build`
+- started with production env vars
+- public/admin/tele surfaces served
+- unauth admin API rejected
+- admin login succeeded
+- uploaded 48 synthetic employee CSV
+- registered all 48 users
+- ran draw and reveal all
+- added final match and winner/runner-up statuses
+- backup/not-joined/participants exports verified
+
+## Office Runbook
+
+- Added `docs/OFFICE-CHECKLIST.md`.

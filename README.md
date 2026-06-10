@@ -137,7 +137,7 @@ npm test
 npm run build
 ```
 
-See `docs/DEPLOYMENT.md` for Windows service notes, environment variables, and backup checklist.
+See `docs/DEPLOYMENT.md` for Windows service notes and environment variables. See `docs/OFFICE-CHECKLIST.md` for the real office run checklist.
 
 Full-stack smoke check used during development:
 

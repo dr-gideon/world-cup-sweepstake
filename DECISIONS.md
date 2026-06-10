@@ -102,3 +102,10 @@ Rationale: Avoid paid API dependency and provider lock-in while giving the app a
 Decision: Add admin-only JSON backup, not-joined CSV, and participants CSV exports, plus `.env.example` and deployment documentation.
 
 Rationale: Before real office use, the organiser needs a safe backup path, reminder list, and clear Windows deployment instructions. Export endpoints require admin auth.
+
+
+## 2026-06-10 — Production-style dry-run passed
+
+Decision: Validate deployment readiness from a clean clone and temp database before any real hosting decision.
+
+Rationale: This proves the production path works independent of the working tree and preview state. The dry-run passed install, build, start, surfaces, admin auth, 48-user allowlist/register/draw/reveal, match result, winner/runner-up, and exports.
