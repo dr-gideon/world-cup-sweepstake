@@ -31,11 +31,21 @@ async function generateSummary({ sourceKey, fallback, context, providerConfig })
     if (!response.ok) throw new Error(`LLM request failed: ${response.status}`);
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content || "";
-    const parsed = JSON.parse(content.replace(/^```json\s*/i, "").replace(/```$/i, ""));
+    const parsed = JSON.parse(extractJson(content));
     return { sourceKey, headline: String(parsed.headline || fallback.headline).slice(0, 120), body: String(parsed.body || fallback.body).slice(0, 360), provider: config.provider };
   } catch {
     return { sourceKey, ...fallback, provider: "fallback" };
   }
+}
+
+function extractJson(content) {
+  const trimmed = String(content || "").trim();
+  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  if (fenced) return fenced[1].trim();
+  const start = trimmed.indexOf("{");
+  const end = trimmed.lastIndexOf("}");
+  if (start >= 0 && end > start) return trimmed.slice(start, end + 1);
+  return trimmed;
 }
 
 function normaliseProviderConfig(config = {}) {
