@@ -88,3 +88,10 @@ Rationale: The office-facing app should not expose organiser controls. Hiding ta
 Decision: Prioritize admin password hardening, CSV template/validation UX, and public/Tele auto-refresh before wiring LLM summaries.
 
 Rationale: The app needs reliable office operation before adding AI-generated copy. Admin password is now required via env var; public/Tele displays refresh automatically; CSV upload is easier to validate before import.
+
+
+## 2026-06-10 — Add manual match data layer before live football API
+
+Decision: Add a local SQLite `matches` table and Admin fixture/result editor before integrating any live football API provider. Tele reads from this local match layer.
+
+Rationale: Avoid paid API dependency and provider lock-in while giving the app a stable contract for fixtures/results. A future provider can sync into the same table.

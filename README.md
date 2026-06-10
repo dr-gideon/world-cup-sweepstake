@@ -165,6 +165,10 @@ Rules:
 - uploading a new CSV before the draw replaces the previous allowlist and clears current participants.
 - after the draw, the allowlist cannot be replaced unless the sweepstake is reset.
 
+## Match Data Provider Direction
+
+Current provider is manual SQLite entry via Admin. This gives Tele fixtures/results without paid API dependency. Future provider can sync into the same match table from API-Football, football-data.org, SportMonks, or another source.
+
 ## Operating Notes
 
 - Upload the employee email list before asking people to register.

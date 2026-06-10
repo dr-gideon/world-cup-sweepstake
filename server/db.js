@@ -60,6 +60,21 @@ export function initDb() {
       event TEXT NOT NULL,
       detail TEXT NOT NULL DEFAULT ''
     );
+
+    CREATE TABLE IF NOT EXISTS matches (
+      id TEXT PRIMARY KEY,
+      stage TEXT NOT NULL DEFAULT 'Group',
+      kickoff TEXT NOT NULL DEFAULT '',
+      home_team_id TEXT NOT NULL,
+      away_team_id TEXT NOT NULL,
+      home_score INTEGER,
+      away_score INTEGER,
+      status TEXT NOT NULL DEFAULT 'scheduled',
+      notes TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY(home_team_id) REFERENCES teams(id),
+      FOREIGN KEY(away_team_id) REFERENCES teams(id)
+    );
   `);
   const count = db.prepare("SELECT COUNT(*) AS count FROM teams").get().count;
   if (count !== 48) {
@@ -90,6 +105,7 @@ export function getState() {
   const assignments = hydrateAssignments(rawAssignments, participants, teams);
   const auditEvents = db.prepare("SELECT at, event, detail FROM audit_events ORDER BY id DESC LIMIT 20").all();
   const allowlistStats = getAllowlistStats();
+  const matches = getMatches();
   return {
     registrationOpen: !draw,
     participants,
@@ -97,7 +113,8 @@ export function getState() {
     draw: draw ? { ...draw, assignments: rawAssignments } : null,
     assignments,
     audit: auditEvents,
-    allowlist: allowlistStats
+    allowlist: allowlistStats,
+    matches
   };
 }
 
@@ -196,8 +213,50 @@ export function revealAll() {
 }
 
 export function resetSweepstake() {
-  db.exec("DELETE FROM assignments; DELETE FROM draws; DELETE FROM participants; UPDATE teams SET status = 'active';");
-  audit("Sweepstake reset", "Participants, draw, and results cleared. Employee allowlist kept.");
+  db.exec("DELETE FROM assignments; DELETE FROM draws; DELETE FROM participants; DELETE FROM matches; UPDATE teams SET status = 'active';");
+  audit("Sweepstake reset", "Participants, draw, results, and matches cleared. Employee allowlist kept.");
+}
+
+export function getMatches() {
+  return db.prepare(`
+    SELECT
+      m.id, m.stage, m.kickoff, m.home_team_id AS homeTeamId, m.away_team_id AS awayTeamId,
+      m.home_score AS homeScore, m.away_score AS awayScore, m.status, m.notes, m.updated_at AS updatedAt,
+      ht.name AS homeName, ht.code AS homeCode, ht.flag AS homeFlag,
+      at.name AS awayName, at.code AS awayCode, at.flag AS awayFlag
+    FROM matches m
+    JOIN teams ht ON ht.id = m.home_team_id
+    JOIN teams at ON at.id = m.away_team_id
+    ORDER BY COALESCE(NULLIF(m.kickoff, ''), m.updated_at) ASC, m.updated_at DESC
+  `).all();
+}
+
+export function upsertMatch(payload) {
+  const homeTeamId = String(payload.homeTeamId || "").trim();
+  const awayTeamId = String(payload.awayTeamId || "").trim();
+  if (!homeTeamId || !awayTeamId || homeTeamId === awayTeamId) throw httpError(400, "Choose two different teams.");
+  const home = db.prepare("SELECT name, flag FROM teams WHERE id = ?").get(homeTeamId);
+  const away = db.prepare("SELECT name, flag FROM teams WHERE id = ?").get(awayTeamId);
+  if (!home || !away) throw httpError(404, "Match team not found.");
+  const id = payload.id || crypto.randomUUID();
+  const status = ["scheduled", "live", "finished", "postponed"].includes(payload.status) ? payload.status : "scheduled";
+  const homeScore = payload.homeScore === "" || payload.homeScore === null || payload.homeScore === undefined ? null : Number(payload.homeScore);
+  const awayScore = payload.awayScore === "" || payload.awayScore === null || payload.awayScore === undefined ? null : Number(payload.awayScore);
+  db.prepare(`
+    INSERT INTO matches (id, stage, kickoff, home_team_id, away_team_id, home_score, away_score, status, notes, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      stage = excluded.stage, kickoff = excluded.kickoff, home_team_id = excluded.home_team_id, away_team_id = excluded.away_team_id,
+      home_score = excluded.home_score, away_score = excluded.away_score, status = excluded.status, notes = excluded.notes, updated_at = excluded.updated_at
+  `).run(id, String(payload.stage || "Group").trim() || "Group", String(payload.kickoff || "").trim(), homeTeamId, awayTeamId, homeScore, awayScore, status, String(payload.notes || "").trim(), new Date().toISOString());
+  audit("Match updated", `${home.flag} ${home.name} ${homeScore ?? "-"} — ${awayScore ?? "-"} ${away.flag} ${away.name} | ${status}`);
+  return db.prepare("SELECT * FROM matches WHERE id = ?").get(id);
+}
+
+export function removeMatch(id) {
+  const result = db.prepare("DELETE FROM matches WHERE id = ?").run(id);
+  if (!result.changes) throw httpError(404, "Match not found.");
+  audit("Match removed", id);
 }
 
 export function importAllowlist(csvText) {

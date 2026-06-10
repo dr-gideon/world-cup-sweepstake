@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import express from "express";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { addParticipant, createDraw, getState, importAllowlist, initDb, lookupEmployee, removeParticipant, resetSweepstake, revealAll, revealNext, updateTeam } from "./db.js";
+import { addParticipant, createDraw, getState, importAllowlist, initDb, lookupEmployee, removeMatch, removeParticipant, resetSweepstake, revealAll, revealNext, updateTeam, upsertMatch } from "./db.js";
 
 const app = express();
 const port = Number(process.env.PORT || 8097);
@@ -48,6 +48,9 @@ app.patch("/api/teams/:id", requireAdmin, wrap((req, res) => { updateTeam(req.pa
 app.post("/api/draw", requireAdmin, wrap((req, res) => { createDraw(req.body?.seed); res.status(201).json(getState()); }));
 app.post("/api/reveal-next", requireAdmin, wrap((req, res) => { revealNext(); res.json(getState()); }));
 app.post("/api/reveal-all", requireAdmin, wrap((req, res) => { revealAll(); res.json(getState()); }));
+app.post("/api/matches", requireAdmin, wrap((req, res) => { upsertMatch(req.body || {}); res.status(201).json(getState()); }));
+app.patch("/api/matches/:id", requireAdmin, wrap((req, res) => { upsertMatch({ ...(req.body || {}), id: req.params.id }); res.json(getState()); }));
+app.delete("/api/matches/:id", requireAdmin, wrap((req, res) => { removeMatch(req.params.id); res.status(204).end(); }));
 app.post("/api/reset", requireAdmin, wrap((req, res) => { resetSweepstake(); res.json(getState()); }));
 
 app.use("/tele", (req, res, next) => { if (req.method !== "GET") return next(); res.type("html").send(readFileSync(indexPath, "utf8")); });

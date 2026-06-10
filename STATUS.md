@@ -165,6 +165,10 @@ Rules:
 - uploading a new CSV before the draw replaces the previous allowlist and clears current participants.
 - after the draw, the allowlist cannot be replaced unless the sweepstake is reset.
 
+## Match Data Provider Direction
+
+Current provider is manual SQLite entry via Admin. This gives Tele fixtures/results without paid API dependency. Future provider can sync into the same match table from API-Football, football-data.org, SportMonks, or another source.
+
 ## Operating Notes
 
 - Upload the employee email list before asking people to register.
@@ -182,8 +186,8 @@ Private GitHub repo:
 https://github.com/dr-gideon/world-cup-sweepstake
 ```
 
-## CSV UX
+## Match Data
 
-- Admin can download a sample employee CSV template.
-- Admin UI previews valid, duplicate, and invalid rows before upload.
-- Upload button is disabled when no valid employee emails are present.
+- Current provider: manual Admin entry stored in SQLite `matches` table.
+- Tele reads latest live/finished matches and upcoming scheduled matches.
+- Future provider integration should write into this same table instead of coupling Tele directly to a paid API.

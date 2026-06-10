@@ -200,7 +200,8 @@ function TelePage({ state }) {
     <div className="tele-frame">
       <div className="tele-top"><span>LIVE FROM THE OFFICE DRAW ROOM</span><b>WORLD CUP SWEEPSTAKE</b><span>{new Date().toLocaleTimeString("en-IE", { hour: "2-digit", minute: "2-digit" })}</span></div>
       <section className="tele-hero"><div><div className="hero-eyebrow">Post-match impact</div><h1 className="hero-title tele-title">{latest ? impactHeadline(latest.detail) : "No drama yet."}</h1><p>{latest ? latest.detail : "Update team statuses in Admin after each match and this screen becomes the office broadcast."}</p></div><div className="scorebug"><strong>{alive.length}</strong><span>Alive</span><strong>{out.length}</strong><span>Out</span></div></section>
-      <div className="tele-grid"><div className="tele-card"><div className="section-label">Prize race</div><Prize icon="🥇" amount="€50" label="Champion" text={prizes.winner ? `${prizes.winner.participant.name} — ${prizes.winner.team.name}` : "Waiting"} /><Prize icon="🥈" amount="€30" label="Runner-up" text={prizes.runnerUp ? `${prizes.runnerUp.participant.name} — ${prizes.runnerUp.team.name}` : "Waiting"} /></div><div className="tele-card"><div className="section-label">Drama feed</div>{impacts.length ? impacts.slice(0, 6).map((impact, i) => <div className="impact-row" key={i}><b>{impactHeadline(impact.detail)}</b><span>{impact.detail}</span></div>) : <Empty icon="📺" title="No match impacts" desc="Change team statuses after matches." />}</div></div>
+      <div className="tele-grid"><div className="tele-card"><div className="section-label">Prize race</div><Prize icon="🥇" amount="€50" label="Champion" text={prizes.winner ? `${prizes.winner.participant.name} — ${prizes.winner.team.name}` : "Waiting"} /><Prize icon="🥈" amount="€30" label="Runner-up" text={prizes.runnerUp ? `${prizes.runnerUp.participant.name} — ${prizes.runnerUp.team.name}` : "Waiting"} /></div><div className="tele-card"><div className="section-label">Latest matches</div><TeleMatches matches={state.matches || []} /></div></div>
+      <div className="tele-grid"><div className="tele-card wide-card"><div className="section-label">Drama feed</div>{impacts.length ? impacts.slice(0, 6).map((impact, i) => <div className="impact-row" key={i}><b>{impactHeadline(impact.detail)}</b><span>{impact.detail}</span></div>) : <Empty icon="📺" title="No match impacts" desc="Change team statuses after matches." />}</div></div>
       <SurvivalBoard assignments={state.assignments || []} />
     </div>
   </main>;
@@ -280,8 +281,49 @@ function AdminPage({ state, action, refresh }) {
       <section className="admin-panel"><div className="admin-panel-title">Employee email list</div><p className="admin-panel-sub">Upload CSV: email,name,department. Emails are not shown publicly.</p><div className="allowlist-stats"><b>{state.allowlist?.eligible || 0}</b><span>eligible</span><b>{state.allowlist?.joined || 0}</b><span>joined</span><b>{state.allowlist?.remaining || 0}</b><span>left</span></div><div className="btn-row csv-actions"><button className="btn btn-ghost" onClick={downloadTemplate}>Download template</button><label className="file-upload">Choose CSV<input type="file" accept=".csv,text/csv" onChange={(e) => loadFile(e.target.files?.[0])} /></label></div><textarea className="csv-box" value={csvText} onChange={(e) => setCsvText(e.target.value)} /><CsvPreview preview={csvPreview} /><button className="btn btn-primary full" disabled={Boolean(state.draw) || !csvPreview.valid.length} onClick={uploadCsv}>Upload {csvPreview.valid.length || ""} employee{csvPreview.valid.length === 1 ? "" : "s"}</button></section>
       <section className="admin-panel"><div className="admin-panel-title">Participants</div><p className="admin-panel-sub">Locked after draw.</p>{state.participants.map((p) => <div className="participant-chip" key={p.id}><div className="participant-avatar">{initials(p.name)}</div><div><div className="participant-name">{p.name}</div><div className="participant-dept">{p.department || "No department"}</div></div><button className="participant-delete" disabled={Boolean(state.draw)} onClick={() => action(`/api/participants/${p.id}`, { method: "DELETE" }, "Participant removed")}>×</button></div>)}{!state.participants.length && <Empty icon="👥" title="No participants" desc="Upload the employee list, then people can enter." />}</section>
     </div>
+    <MatchAdmin state={state} action={action} />
     <section className="admin-panel wide"><div className="teams-header"><div><div className="admin-panel-title">Teams and results</div><p className="admin-panel-sub">Rename qualifiers and update match status.</p></div><input className="search-input" placeholder="Search teams…" value={adminSearch} onChange={(e) => setAdminSearch(e.target.value)} /></div><div>{filteredTeams.map((team) => <AdminTeamRow key={team.id} team={team} action={action} />)}</div></section>
   </main>;
+}
+
+function MatchAdmin({ state, action }) {
+  const first = state.teams[0]?.id || "";
+  const second = state.teams[1]?.id || "";
+  const [form, setForm] = useState({ stage: "Group", kickoff: "", homeTeamId: first, awayTeamId: second, homeScore: "", awayScore: "", status: "scheduled", notes: "" });
+  useEffect(() => { setForm((current) => ({ ...current, homeTeamId: current.homeTeamId || first, awayTeamId: current.awayTeamId || second })); }, [first, second]);
+  function update(patch) { setForm((current) => ({ ...current, ...patch })); }
+  async function save() {
+    await action("/api/matches", { method: "POST", body: form }, "Match saved");
+    setForm((current) => ({ ...current, homeScore: "", awayScore: "", notes: "" }));
+  }
+  return <section className="admin-panel wide match-admin"><div className="teams-header"><div><div className="admin-panel-title">Fixtures and results</div><p className="admin-panel-sub">Manual match layer now, live provider later. Tele reads from these results.</p></div></div>
+    <div className="match-form">
+      <input className="admin-input" value={form.stage} onChange={(e) => update({ stage: e.target.value })} placeholder="Stage" />
+      <input className="admin-input" type="datetime-local" value={form.kickoff} onChange={(e) => update({ kickoff: e.target.value })} />
+      <select className="admin-select" value={form.homeTeamId} onChange={(e) => update({ homeTeamId: e.target.value })}>{state.teams.map((team) => <option key={team.id} value={team.id}>{team.flag} {team.name}</option>)}</select>
+      <select className="admin-select" value={form.awayTeamId} onChange={(e) => update({ awayTeamId: e.target.value })}>{state.teams.map((team) => <option key={team.id} value={team.id}>{team.flag} {team.name}</option>)}</select>
+      <input className="admin-input" type="number" min="0" value={form.homeScore} onChange={(e) => update({ homeScore: e.target.value })} placeholder="Home" />
+      <input className="admin-input" type="number" min="0" value={form.awayScore} onChange={(e) => update({ awayScore: e.target.value })} placeholder="Away" />
+      <select className="admin-select" value={form.status} onChange={(e) => update({ status: e.target.value })}><option value="scheduled">Scheduled</option><option value="live">Live</option><option value="finished">Finished</option><option value="postponed">Postponed</option></select>
+      <input className="admin-input" value={form.notes} onChange={(e) => update({ notes: e.target.value })} placeholder="Notes" />
+      <button className="btn btn-primary" disabled={!form.homeTeamId || !form.awayTeamId || form.homeTeamId === form.awayTeamId} onClick={save}>Save match</button>
+    </div>
+    <div className="match-list">{(state.matches || []).slice().reverse().map((match) => <div className="match-row" key={match.id}><span>{match.stage}</span><b>{match.homeFlag} {match.homeName}</b><strong>{scoreText(match)}</strong><b>{match.awayFlag} {match.awayName}</b><em>{match.status}</em><button className="participant-delete" onClick={() => action(`/api/matches/${match.id}`, { method: "DELETE" }, "Match removed")}>×</button></div>)}{!(state.matches || []).length && <Empty icon="⚽" title="No matches yet" desc="Add fixtures or results manually for Tele." />}</div>
+  </section>;
+}
+
+function TeleMatches({ matches }) {
+  const latest = matches.filter((m) => m.status === "live" || m.status === "finished").slice(-4).reverse();
+  const upcoming = matches.filter((m) => m.status === "scheduled").slice(0, 3);
+  const rows = latest.length ? latest : upcoming;
+  if (!rows.length) return <Empty icon="⚽" title="No fixtures yet" desc="Admin can add manual fixtures/results." />;
+  return <div className="tele-match-list">{rows.map((match) => <div className={`tele-match ${match.status}`} key={match.id}><span>{match.stage}</span><b>{match.homeFlag} {match.homeCode}</b><strong>{scoreText(match)}</strong><b>{match.awayCode} {match.awayFlag}</b><em>{match.status}</em></div>)}</div>;
+}
+
+function scoreText(match) {
+  const home = match.homeScore ?? "-";
+  const away = match.awayScore ?? "-";
+  return `${home} : ${away}`;
 }
 
 function AdminDrawControls({ state, action }) {
