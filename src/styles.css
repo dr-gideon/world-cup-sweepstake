@@ -223,3 +223,5 @@ a.btn { text-decoration:none; display:inline-flex; align-items:center; justify-c
 .match-row small { display:block; color:#777; font-size:11px; margin-top:2px; }
 .match-row .team-crest { width:22px; height:22px; margin-right:6px; }
 @media (max-width:760px) { .fixture-row { grid-template-columns:1fr; } .fixture-team.away { justify-content:flex-start; } .fixture-row em,.fixture-score { text-align:left; } }
+
+.impact-row em { color:#777; font-size:11px; font-style:normal; text-transform:uppercase; letter-spacing:1px; }

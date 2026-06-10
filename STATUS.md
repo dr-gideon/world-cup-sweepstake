@@ -247,3 +247,11 @@ A clean clone production-style dry-run passed on temp port `8108` with temp DB:
 - Scheduler respects low request budget by skipping sync when `X-RequestsAvailable <= 2`.
 - Admin shows scheduler enabled/running/last message.
 - Automatic status derivation is limited to knockout/final matches. Group-stage elimination remains manual/safe.
+
+## OpenRouter Tele Drama
+
+- Added OpenRouter support via `OPENROUTER_API_KEY` and `OPENROUTER_MODEL`.
+- Finished matches can generate cached drama summaries keyed by match/result.
+- Tele drama feed now prefers cached summaries, then falls back to Match impact events.
+- Manual `Generate Tele summary` works with OpenRouter/OpenAI/fallback.
+- OpenRouter smoke with temp key succeeded; key not committed.

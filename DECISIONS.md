@@ -130,3 +130,10 @@ Rationale: The confirmed World Cup team list and fixtures are available from Foo
 Decision: Add an optional in-app Football-Data scheduler controlled by env vars, and derive team statuses only from finished knockout/final matches.
 
 Rationale: Tele should update without manual sync during the tournament, but group-stage elimination has standings/tiebreaker complexity. Knockout losers/champion/runner-up are safe to derive from finished match results.
+
+
+## 2026-06-10 — Use OpenRouter for cached Tele drama summaries
+
+Decision: Support `OPENROUTER_API_KEY` as the primary LLM path for Tele drama summaries, with OpenAI and deterministic fallback remaining available. Cache summaries by match/result source key.
+
+Rationale: Dr. Wells provided an OpenRouter key and wants group-stage match results to feed Tele drama. Caching avoids repeated LLM calls on every Tele refresh or sync.

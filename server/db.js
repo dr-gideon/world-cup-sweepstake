@@ -131,6 +131,7 @@ export function getState() {
   const matches = getMatches();
   const providerSync = getProviderSync();
   const teleSummary = getLatestTeleSummary();
+  const teleSummaries = getTeleSummaries();
   return {
     registrationOpen: !draw,
     participants,
@@ -141,7 +142,8 @@ export function getState() {
     allowlist: allowlistStats,
     matches,
     providerSync,
-    teleSummary
+    teleSummary,
+    teleSummaries
   };
 }
 
@@ -399,6 +401,14 @@ export function createTeleSummary({ sourceKey, headline, body, provider = "fallb
 
 export function getLatestTeleSummary() {
   return db.prepare("SELECT id, source_key AS sourceKey, headline, body, provider, created_at AS createdAt FROM tele_summaries ORDER BY created_at DESC LIMIT 1").get() || null;
+}
+
+export function getTeleSummaries() {
+  return db.prepare("SELECT id, source_key AS sourceKey, headline, body, provider, created_at AS createdAt FROM tele_summaries ORDER BY created_at DESC LIMIT 8").all();
+}
+
+export function hasTeleSummary(sourceKey) {
+  return Boolean(db.prepare("SELECT id FROM tele_summaries WHERE source_key = ?").get(sourceKey));
 }
 
 function mapFootballDataTeam(apiTeam, teams) {

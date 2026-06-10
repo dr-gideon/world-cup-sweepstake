@@ -3,8 +3,8 @@ import express from "express";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fetchFootballDataMatches } from "./football-data.js";
-import { buildTeleSummary } from "./tele-summary.js";
-import { addParticipant, createDraw, createTeleSummary, exportBackupJson, exportNotJoinedCsv, exportParticipantsCsv, getState, importAllowlist, importFootballDataTeams, initDb, lookupEmployee, recordProviderSync, removeMatch, removeParticipant, resetSweepstake, revealAll, revealNext, syncFootballDataMatches, updateTeam, upsertMatch } from "./db.js";
+import { buildMatchDramaSummary, buildTeleSummary } from "./tele-summary.js";
+import { addParticipant, createDraw, createTeleSummary, exportBackupJson, exportNotJoinedCsv, exportParticipantsCsv, getState, hasTeleSummary, importAllowlist, importFootballDataTeams, initDb, lookupEmployee, recordProviderSync, removeMatch, removeParticipant, resetSweepstake, revealAll, revealNext, syncFootballDataMatches, updateTeam, upsertMatch } from "./db.js";
 
 const app = express();
 const port = Number(process.env.PORT || 8097);
@@ -74,7 +74,7 @@ app.post("/api/providers/football-data/sync", requireAdmin, wrap(async (req, res
   res.json({ ...getState(), scheduler: schedulerStatus() });
 }));
 app.post("/api/tele-summary/generate", requireAdmin, wrap(async (req, res) => {
-  const summary = await buildTeleSummary({ state: getState(), openAiKey: process.env.OPENAI_API_KEY || "", model: process.env.OPENAI_MODEL || "gpt-4o-mini" });
+  const summary = await buildTeleSummary({ state: getState(), providerConfig: llmConfig() });
   createTeleSummary(summary);
   res.json(getState());
 }));
@@ -140,11 +140,35 @@ async function runFootballDataSync({ dateFrom = "", dateTo = "", manual = false 
       return;
     }
     const sync = syncFootballDataMatches(result.payload.matches || [], result.throttling);
+    const drama = await generateDramaForFinishedMatches();
     scheduler.lastRunAt = new Date().toISOString();
-    scheduler.lastMessage = `Imported ${sync.imported}, skipped ${sync.skipped}, status updates ${sync.statusUpdates || 0}.`;
+    scheduler.lastMessage = `Imported ${sync.imported}, skipped ${sync.skipped}, status updates ${sync.statusUpdates || 0}, drama ${drama}.`;
   } finally {
     scheduler.running = false;
   }
+}
+
+async function generateDramaForFinishedMatches() {
+  const state = getState();
+  const finished = (state.matches || []).filter((match) => match.status === "finished").slice(-12);
+  let generated = 0;
+  for (const match of finished) {
+    const sourceKey = `match:${match.id}:${match.status}:${match.homeScore ?? ""}:${match.awayScore ?? ""}`;
+    if (hasTeleSummary(sourceKey)) continue;
+    const summary = await buildMatchDramaSummary({ match, providerConfig: llmConfig() });
+    createTeleSummary(summary);
+    generated += 1;
+  }
+  return generated;
+}
+
+function llmConfig() {
+  return {
+    openRouterKey: process.env.OPENROUTER_API_KEY || "",
+    openRouterModel: process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini",
+    openAiKey: process.env.OPENAI_API_KEY || "",
+    openAiModel: process.env.OPENAI_MODEL || "gpt-4o-mini"
+  };
 }
 
 function schedulerStatus() {
