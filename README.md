@@ -21,8 +21,9 @@ The original Resolve-dashboard MVP is archived as git tag:
 mvp-resolve-dashboard-2026-06-10
 ```
 
-The current app keeps the Resolve colour influence but switches to a modern event-style experience:
+The current app uses the Claude-designed visual direction from `/home/giddy/temp/Resolve logo and icon/sweepstake.jsx`, wired into the real Express/SQLite backend:
 
+- Enterpryze/Resolve logo assets in `public/assets/`
 - “ticket” entry screen
 - animated draw-stage UI
 - exciting team reveal

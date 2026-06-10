@@ -67,3 +67,10 @@ Rationale: The sweepstake should feel alive during the tournament, with broadcas
 Decision: Admin uploads a CSV employee list with `email,name,department`; registration requires a matching email and each email can join once. Public app state and screens do not display employee email addresses.
 
 Rationale: The office needs fair one-entry-per-employee registration without Microsoft login setup. A CSV allowlist is simple, auditable, and easy for the organiser to prepare.
+
+
+## 2026-06-10 — Rebuild frontend from Claude sweepstake design
+
+Decision: Archive the SQLite/allowlist/Tele build as `pre-claude-ui-sqlite-allowlist-2026-06-10`, then rebuild the frontend using the Claude-designed `sweepstake.jsx` visual direction and Resolve/Enterpryze logo assets from `/home/giddy/temp/Resolve logo and icon/`.
+
+Rationale: Dr. Wells preferred the Claude design. The rebuild keeps the production backend features while adopting the stronger dark/gold sports-event UI.
