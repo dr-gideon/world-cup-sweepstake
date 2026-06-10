@@ -1,33 +1,42 @@
-# STATUS.md
+# MVP — World Cup Sweepstake
 
-## Status
+## Users
 
-Project created. Planning / MVP definition stage.
+- Participant: joins the sweepstake and views assigned team(s).
+- Admin: manages registration, runs the draw, updates results.
+- Office viewer: watches the draw or leaderboard on a shared screen.
 
-GitHub: https://github.com/dr-gideon/world-cup-sweepstake
+## Core Flow
 
-## Current Direction
+1. Admin opens registration.
+2. Participants enter name and optional department.
+3. Admin closes registration.
+4. App assigns all 48 World Cup teams fairly across participants.
+5. Big-screen draw reveals assignments.
+6. Public board shows team ownership.
+7. Admin updates champion and runner-up at the end.
+8. Prize winners are displayed.
 
-Build a small polished web app for an office 2026 World Cup sweepstake:
+## Draw Rules
 
-- free entry
-- CEO-sponsored prizes
-- €50 for winning team owner
-- €30 for runner-up team owner
-- all 48 teams assigned across participants
-- big-screen draw and live ownership board
+- Every participant receives at least one team.
+- All 48 teams are assigned.
+- If participants < 48, bonus teams are randomly distributed.
+- If participants > 48, the MVP blocks the draw until extra entries are removed or shared/team-pair rules are agreed.
+- Future enhancement: use pots to balance favourites, strong teams, mid-tier teams, and outsiders.
 
-## Next Steps
+## MVP Screens
 
-1. Decide stack.
-2. Define draw fairness rules.
-3. Create team dataset.
-4. Build participant registration.
-5. Build admin draw flow.
-6. Build public display board.
+- Landing / join page
+- Admin dashboard
+- Draw setup page
+- Animated reveal page
+- Team ownership board
+- Prize outcome page
 
-## Operating Notes
+## Out of Scope for MVP
 
-- Keep it simple and office-friendly.
-- No payment/buy-in handling.
-- Prefer manual result updates for MVP unless live sports API is approved later.
+- Payments or buy-ins
+- Live sports API integration
+- Authentication beyond a simple admin passcode
+- Complex prediction game

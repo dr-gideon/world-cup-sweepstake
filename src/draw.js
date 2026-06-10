@@ -43,6 +43,9 @@ export function runDraw(participants, teams, seedText = "") {
   if (!Array.isArray(teams) || teams.length !== 48) {
     throw new Error("The draw requires exactly 48 team slots.");
   }
+  if (participants.length > teams.length) {
+    throw new Error("This MVP supports up to 48 participants because each World Cup team can have one owner. Remove extra participants or agree shared-team rules before running the draw.");
+  }
   const random = createSeededRandom(seedText || `${Date.now()}:${participants.length}`);
   const participantOrder = shuffle(participants, random);
   const potOrder = [1, 2, 3, 4].flatMap((pot) => shuffle(teams.filter((team) => team.pot === pot), random));

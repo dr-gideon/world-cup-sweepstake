@@ -22,7 +22,7 @@
 - Every participant receives at least one team.
 - All 48 teams are assigned.
 - If participants < 48, bonus teams are randomly distributed.
-- If participants > 48, only 48 entries can receive teams unless the office chooses shared/team-pair entries.
+- If participants > 48, the MVP blocks the draw until extra entries are removed or shared/team-pair rules are agreed.
 - Future enhancement: use pots to balance favourites, strong teams, mid-tier teams, and outsiders.
 
 ## MVP Screens

@@ -77,17 +77,21 @@ function App() {
   }
 
   function executeDraw(seed) {
-    update((current) => {
-      const draw = runDraw(current.participants, current.teams, seed);
-      return {
-        ...current,
-        registrationOpen: false,
-        draw,
-        revealIndex: -1,
-        audit: [audit("Draw created", `${draw.assignments.length} teams assigned across ${current.participants.length} participants`), ...current.audit]
-      };
-    });
-    setView("reveal");
+    try {
+      update((current) => {
+        const draw = runDraw(current.participants, current.teams, seed);
+        return {
+          ...current,
+          registrationOpen: false,
+          draw,
+          revealIndex: -1,
+          audit: [audit("Draw created", `${draw.assignments.length} teams assigned across ${current.participants.length} participants`), ...current.audit]
+        };
+      });
+      setView("reveal");
+    } catch (error) {
+      alert(error.message);
+    }
   }
 
   function revealNext() {
@@ -326,9 +330,10 @@ function Admin({ state, executeDraw, toggleRegistration, updateTeam, resetApp })
       <div className="control-grid">
         <button className="secondary-btn" onClick={toggleRegistration}>{state.registrationOpen ? "Close registration" : "Re-open registration"}</button>
         <label>Draw seed<input value={seed} onChange={(event) => setSeed(event.target.value)} placeholder="Optional seed" /></label>
-        <button className="primary-btn" disabled={state.participants.length === 0} onClick={() => executeDraw(seed)}><RefreshCcw size={16} /> Run / re-run draw</button>
+        <button className="primary-btn" disabled={state.participants.length === 0 || state.participants.length > 48} onClick={() => executeDraw(seed)}><RefreshCcw size={16} /> Run / re-run draw</button>
       </div>
       <p className="notice info">Re-running the draw replaces current assignments. Export a backup first if this is a live office draw.</p>
+      {state.participants.length > 48 && <p className="notice warning">There are {state.participants.length} participants for 48 team slots. This MVP blocks the draw until extra entries are removed or shared-team rules are agreed.</p>}
     </div>
 
     <div className="card admin-card">

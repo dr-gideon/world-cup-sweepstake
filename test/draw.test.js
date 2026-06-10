@@ -26,3 +26,8 @@ test("runDraw keeps bonus-team spread balanced", () => {
   const counts = participants.map((participant) => draw.assignments.filter((assignment) => assignment.participantId === participant.id).length);
   assert.equal(Math.max(...counts) - Math.min(...counts), 1);
 });
+
+test("runDraw blocks more participants than team slots", () => {
+  const tooMany = Array.from({ length: 49 }, (_, index) => ({ id: `x${index}`, name: `Extra ${index}` }));
+  assert.throws(() => runDraw(tooMany, DEFAULT_TEAMS, "seed"), /up to 48 participants/);
+});
