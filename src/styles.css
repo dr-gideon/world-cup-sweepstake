@@ -259,3 +259,10 @@ a.btn { text-decoration:none; display:inline-flex; align-items:center; justify-c
 .modal-close { position:absolute; top:14px; right:14px; width:36px; height:36px; border-radius:50%; border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.06); color:#fff; font-size:24px; line-height:1; }
 @keyframes modalPop { from { opacity:0; transform:translateY(18px) scale(.96); } to { opacity:1; transform:translateY(0) scale(1); } }
 @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+.reveal-card.mystery { background:radial-gradient(circle at 50% 20%, rgba(255,215,0,.2), transparent 38%), linear-gradient(145deg,#10152b,#060915); }
+.reveal-card.spinning { animation:cardPulse .28s ease infinite alternate; }
+.spin-crest { animation:flagPop .16s ease infinite alternate; }
+.mystery-ball { z-index:1; width:132px; height:132px; display:grid; place-items:center; border-radius:50%; background:linear-gradient(145deg,#fff,#dfe5f5); color:#111; font-size:82px; font-weight:1000; box-shadow:0 18px 60px rgba(0,0,0,.35), inset 0 -12px 28px rgba(0,0,0,.12); }
+@keyframes cardPulse { from { transform:scale(.995); box-shadow:0 30px 110px rgba(0,0,0,.45), 0 0 70px rgba(255,215,0,.08); } to { transform:scale(1.01); box-shadow:0 34px 130px rgba(0,0,0,.5), 0 0 110px rgba(255,215,0,.18); } }
+@keyframes flagPop { from { transform:scale(.94) rotate(-2deg); } to { transform:scale(1.04) rotate(2deg); } }
+@media (prefers-reduced-motion: reduce) { .reveal-card.spinning, .spin-crest { animation:none; } }

@@ -190,9 +190,20 @@ function DrawPage({ state, action, setPage }) {
   const [email, setEmail] = useState("");
   const [lookup, setLookup] = useState(null);
   const [revealIndex, setRevealIndex] = useState(0);
+  const [revealedTeams, setRevealedTeams] = useState({});
+  const [spinning, setSpinning] = useState(false);
+  const [spinIndex, setSpinIndex] = useState(0);
   const remembered = readRememberedParticipant();
   const personalAssignments = lookup?.assignments?.length ? lookup.assignments : remembered?.id ? assignments.filter((assignment) => assignment.participant.id === remembered.id) : [];
   const current = personalAssignments[revealIndex] || personalAssignments[0];
+  const isCurrentRevealed = current ? Boolean(revealedTeams[current.id]) : false;
+  const spinTeam = state.teams?.[spinIndex % Math.max(state.teams.length, 1)];
+
+  useEffect(() => {
+    if (!spinning) return undefined;
+    const interval = setInterval(() => setSpinIndex((index) => index + 1), 80);
+    return () => clearInterval(interval);
+  }, [spinning]);
 
   async function findTeams(event) {
     event.preventDefault();
@@ -201,6 +212,16 @@ function DrawPage({ state, action, setPage }) {
     setLookup(result);
     if (result.participant) localStorage.setItem("wcs_participant", JSON.stringify({ id: result.participant.id, email, name: result.participant.name }));
     setRevealIndex(0);
+  }
+
+  function startReveal() {
+    if (!current || spinning) return;
+    setSpinning(true);
+    setSpinIndex(Math.floor(Math.random() * Math.max(state.teams.length, 1)));
+    setTimeout(() => {
+      setSpinning(false);
+      setRevealedTeams((existing) => ({ ...existing, [current.id]: true }));
+    }, 2200);
   }
 
   function nextReveal() {
@@ -218,14 +239,26 @@ function DrawPage({ state, action, setPage }) {
       <div className="reveal-card-stage">
         {personalAssignments.length ? <>
           <div className="reveal-count">Team {revealIndex + 1} of {personalAssignments.length}</div>
-          <div className="reveal-card" key={current?.id}>
+          <div className={`reveal-card ${spinning ? "spinning" : ""} ${!isCurrentRevealed && !spinning ? "mystery" : ""}`} key={`${current?.id}-${isCurrentRevealed}-${spinning}`}>
             <div className="reveal-card-shine" />
-            <div className="reveal-crest"><TeamMark flag={current.team.flag} name={current.team.name} /></div>
-            <div className="reveal-kicker">{current.participant.name} drew</div>
-            <h2>{current.team.name}</h2>
-            <p>{current.team.code} · Pot {current.team.pot}</p>
+            {spinning ? <>
+              <div className="reveal-crest spin-crest"><TeamMark flag={spinTeam?.flag} name={spinTeam?.name || "World Cup"} /></div>
+              <div className="reveal-kicker">Drawing the team…</div>
+              <h2>{spinTeam?.name || "World Cup"}</h2>
+              <p>Flags are flying</p>
+            </> : isCurrentRevealed ? <>
+              <div className="reveal-crest"><TeamMark flag={current.team.flag} name={current.team.name} /></div>
+              <div className="reveal-kicker">{current.participant.name} drew</div>
+              <h2>{current.team.name}</h2>
+              <p>{current.team.code} · Pot {current.team.pot}</p>
+            </> : <>
+              <div className="mystery-ball">?</div>
+              <div className="reveal-kicker">Your team is locked in</div>
+              <h2>Ready?</h2>
+              <p>Tap reveal to start the draw animation</p>
+            </>}
           </div>
-          <div className="btn-row center"><button className="btn btn-primary" disabled={revealIndex >= personalAssignments.length - 1} onClick={nextReveal}>Reveal next team →</button><button className="btn btn-ghost" onClick={() => setRevealIndex(0)}>Start again</button></div>
+          <div className="btn-row center">{!isCurrentRevealed ? <button className="btn btn-primary" disabled={spinning} onClick={startReveal}>{spinning ? "Revealing…" : "Reveal my team"}</button> : <><button className="btn btn-primary" disabled={revealIndex >= personalAssignments.length - 1} onClick={nextReveal}>Next team →</button><button className="btn btn-ghost" onClick={() => { setRevealedTeams({}); setRevealIndex(0); }}>Start again</button></>}</div>
         </> : <div className="entry-card find-card"><div className="entry-card-header"><div className="entry-card-eyebrow">Find my draw</div><div className="entry-card-title">Enter your email</div><div className="entry-card-sub">Same work email used to join</div></div><form className="entry-card-body" onSubmit={findTeams}><p>This browser does not know who entered. Type your work email to reveal your teams.</p>{lookup && !lookup.found && <Notice tone="warn">No draw entry found for that email.</Notice>}<Field label="Work email"><input className="form-input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@company.com" /></Field><button className="btn-enter" disabled={!email.trim()}>Find my teams</button></form></div>}
       </div>
 
