@@ -199,3 +199,6 @@ a.btn { text-decoration:none; display:inline-flex; align-items:center; justify-c
 .provider-status span { color:#d1d5db; font-size:13px; }
 .provider-status em { color:#777; font-size:12px; font-style:normal; }
 @media (max-width:1040px) { .provider-grid { grid-template-columns:1fr; } }
+.team-crest { width:32px; height:32px; object-fit:contain; vertical-align:middle; display:inline-block; }
+.draw-card-flag .team-crest { width:44px; height:44px; }
+.survival-row .team-crest { width:24px; height:24px; }

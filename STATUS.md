@@ -230,3 +230,11 @@ A clean clone production-style dry-run passed on temp port `8108` with temp DB:
 - Env vars: `OPENAI_API_KEY`, optional `OPENAI_MODEL`.
 - Without LLM env, Tele summary generation falls back to deterministic local copy.
 - Live Football-Data smoke with temp key returned WC matches and safely skipped unmatched placeholder teams.
+
+## Football-Data Team Import
+
+- Added Admin `Import teams` action for Football-Data.
+- Imports the 48 World Cup teams from Football-Data fixture teams before the draw.
+- Blocks team replacement after the draw has run.
+- Stores crest URLs in the existing team flag field and renders them as images where appropriate.
+- Live smoke with temp key imported 48 teams; subsequent match sync imported 72 matches and skipped 32 unmatched/TBD provider entries.

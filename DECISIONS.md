@@ -116,3 +116,10 @@ Rationale: This proves the production path works independent of the working tree
 Decision: Use Football-Data as the first live football provider, behind an optional env-keyed sync endpoint. Record rate-limit response headers and skip imports where API teams cannot be confidently mapped to local sweepstake teams. Add cached Tele summaries with optional OpenAI-backed generation and deterministic fallback.
 
 Rationale: This adds the live-data/LLM path without making the app dependent on paid/API availability or risking corrupt match/team mappings while 2026 qualifiers are incomplete.
+
+
+## 2026-06-10 — Import confirmed World Cup teams from Football-Data
+
+Decision: Add an Admin `Import teams` action that fetches Football-Data WC fixtures, extracts the 48 unique teams, replaces local placeholder team slots before the draw, and stores crest URLs for UI display. The action is blocked once a draw exists.
+
+Rationale: The confirmed World Cup team list and fixtures are available from Football-Data, so the app should not require manual entry of all teams. Blocking after draw protects existing assignments.

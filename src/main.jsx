@@ -294,7 +294,7 @@ function ProviderPanel({ state, action }) {
   const [dateTo, setDateTo] = useState("");
   const footballStatus = (state.providerSync || []).find((item) => item.provider === "football-data");
   return <section className="admin-panel export-panel"><div className="admin-panel-title">Football data and Tele summaries</div><p className="admin-panel-sub">Football-Data sync is rate-limit-aware. It records remaining request headers and skips importing unmatched teams. LLM summaries are cached and fall back to local copy if no LLM key is configured.</p>
-    <div className="provider-grid"><input className="admin-input" value="WC" readOnly /><input className="admin-input" value={season} onChange={(e) => setSeason(e.target.value)} placeholder="Season" /><input className="admin-input" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /><input className="admin-input" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /><button className="btn btn-primary" onClick={() => action("/api/providers/football-data/sync", { method: "POST", body: { competition: "WC", season, dateFrom, dateTo } }, "Football-Data sync complete")}>Sync Football-Data</button><button className="btn btn-ghost" onClick={() => action("/api/tele-summary/generate", { method: "POST" }, "Tele summary generated")}>Generate Tele summary</button></div>
+    <div className="provider-grid"><input className="admin-input" value="WC" readOnly /><input className="admin-input" value={season} onChange={(e) => setSeason(e.target.value)} placeholder="Season" /><input className="admin-input" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /><input className="admin-input" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /><button className="btn btn-primary" onClick={() => action("/api/providers/football-data/import-teams", { method: "POST", body: { competition: "WC", season, dateFrom, dateTo } }, "Football-Data teams imported")}>Import teams</button><button className="btn btn-ghost" onClick={() => action("/api/providers/football-data/sync", { method: "POST", body: { competition: "WC", season, dateFrom, dateTo } }, "Football-Data sync complete")}>Sync matches</button><button className="btn btn-ghost" onClick={() => action("/api/tele-summary/generate", { method: "POST" }, "Tele summary generated")}>Generate Tele summary</button></div>
     <div className="provider-status"><b>Football-Data</b><span>{footballStatus ? `${footballStatus.status}: ${footballStatus.message}` : "Not synced yet"}</span><em>{footballStatus ? `Requests left: ${footballStatus.requestsAvailable ?? "?"}; reset: ${footballStatus.resetSeconds ?? "?"}s` : "Headers will show after sync"}</em></div>
     {state.teleSummary && <div className="provider-status"><b>Tele summary</b><span>{state.teleSummary.headline}</span><em>{state.teleSummary.provider} · {state.teleSummary.createdAt}</em></div>}
   </section>;
@@ -314,15 +314,15 @@ function MatchAdmin({ state, action }) {
     <div className="match-form">
       <input className="admin-input" value={form.stage} onChange={(e) => update({ stage: e.target.value })} placeholder="Stage" />
       <input className="admin-input" type="datetime-local" value={form.kickoff} onChange={(e) => update({ kickoff: e.target.value })} />
-      <select className="admin-select" value={form.homeTeamId} onChange={(e) => update({ homeTeamId: e.target.value })}>{state.teams.map((team) => <option key={team.id} value={team.id}>{team.flag} {team.name}</option>)}</select>
-      <select className="admin-select" value={form.awayTeamId} onChange={(e) => update({ awayTeamId: e.target.value })}>{state.teams.map((team) => <option key={team.id} value={team.id}>{team.flag} {team.name}</option>)}</select>
+      <select className="admin-select" value={form.homeTeamId} onChange={(e) => update({ homeTeamId: e.target.value })}>{state.teams.map((team) => <option key={team.id} value={team.id}>{team.flag?.startsWith?.("http") ? "🌐" : team.flag} {team.name}</option>)}</select>
+      <select className="admin-select" value={form.awayTeamId} onChange={(e) => update({ awayTeamId: e.target.value })}>{state.teams.map((team) => <option key={team.id} value={team.id}>{team.flag?.startsWith?.("http") ? "🌐" : team.flag} {team.name}</option>)}</select>
       <input className="admin-input" type="number" min="0" value={form.homeScore} onChange={(e) => update({ homeScore: e.target.value })} placeholder="Home" />
       <input className="admin-input" type="number" min="0" value={form.awayScore} onChange={(e) => update({ awayScore: e.target.value })} placeholder="Away" />
       <select className="admin-select" value={form.status} onChange={(e) => update({ status: e.target.value })}><option value="scheduled">Scheduled</option><option value="live">Live</option><option value="finished">Finished</option><option value="postponed">Postponed</option></select>
       <input className="admin-input" value={form.notes} onChange={(e) => update({ notes: e.target.value })} placeholder="Notes" />
       <button className="btn btn-primary" disabled={!form.homeTeamId || !form.awayTeamId || form.homeTeamId === form.awayTeamId} onClick={save}>Save match</button>
     </div>
-    <div className="match-list">{(state.matches || []).slice().reverse().map((match) => <div className="match-row" key={match.id}><span>{match.stage}</span><b>{match.homeFlag} {match.homeName}</b><strong>{scoreText(match)}</strong><b>{match.awayFlag} {match.awayName}</b><em>{match.status}</em><button className="participant-delete" onClick={() => action(`/api/matches/${match.id}`, { method: "DELETE" }, "Match removed")}>×</button></div>)}{!(state.matches || []).length && <Empty icon="⚽" title="No matches yet" desc="Add fixtures or results manually for Tele." />}</div>
+    <div className="match-list">{(state.matches || []).slice().reverse().map((match) => <div className="match-row" key={match.id}><span>{match.stage}</span><b>{flagText(match.homeFlag)} {match.homeName}</b><strong>{scoreText(match)}</strong><b>{flagText(match.awayFlag)} {match.awayName}</b><em>{match.status}</em><button className="participant-delete" onClick={() => action(`/api/matches/${match.id}`, { method: "DELETE" }, "Match removed")}>×</button></div>)}{!(state.matches || []).length && <Empty icon="⚽" title="No matches yet" desc="Add fixtures or results manually for Tele." />}</div>
   </section>;
 }
 
@@ -331,7 +331,7 @@ function TeleMatches({ matches }) {
   const upcoming = matches.filter((m) => m.status === "scheduled").slice(0, 3);
   const rows = latest.length ? latest : upcoming;
   if (!rows.length) return <Empty icon="⚽" title="No fixtures yet" desc="Admin can add manual fixtures/results." />;
-  return <div className="tele-match-list">{rows.map((match) => <div className={`tele-match ${match.status}`} key={match.id}><span>{match.stage}</span><b>{match.homeFlag} {match.homeCode}</b><strong>{scoreText(match)}</strong><b>{match.awayCode} {match.awayFlag}</b><em>{match.status}</em></div>)}</div>;
+  return <div className="tele-match-list">{rows.map((match) => <div className={`tele-match ${match.status}`} key={match.id}><span>{match.stage}</span><b>{flagText(match.homeFlag)} {match.homeCode}</b><strong>{scoreText(match)}</strong><b>{match.awayCode} {flagText(match.awayFlag)}</b><em>{match.status}</em></div>)}</div>;
 }
 
 function scoreText(match) {
@@ -365,18 +365,23 @@ function AdminTeamRow({ team, action }) {
 
 function DrawCard({ assignment }) {
   const pot = potColor(assignment.team.pot);
-  return <div className={`draw-card ${assignment.revealed ? "assigned" : "hidden"}`}><span className="pot-badge" style={{ background: pot.bg, color: pot.text }}>POT {assignment.team.pot}</span><div className="draw-card-flag">{assignment.revealed ? assignment.team.flag : "❔"}</div><div className="draw-card-team">{assignment.revealed ? assignment.team.name : "Hidden team"}</div>{assignment.revealed ? <div className="draw-card-owner">{assignment.participant.name}</div> : <div className="draw-card-empty">Waiting reveal</div>}</div>;
+  return <div className={`draw-card ${assignment.revealed ? "assigned" : "hidden"}`}><span className="pot-badge" style={{ background: pot.bg, color: pot.text }}>POT {assignment.team.pot}</span><div className="draw-card-flag">{assignment.revealed ? <TeamMark flag={assignment.team.flag} name={assignment.team.name} /> : "❔"}</div><div className="draw-card-team">{assignment.revealed ? assignment.team.name : "Hidden team"}</div>{assignment.revealed ? <div className="draw-card-owner">{assignment.participant.name}</div> : <div className="draw-card-empty">Waiting reveal</div>}</div>;
 }
 
 function TeamRow({ assignment }) {
-  return <div className={`team-row ${assignment.team.status === "eliminated" ? "eliminated" : ""}`}><div className="team-flag">{assignment.team.flag}</div><div><div className="team-name">{assignment.team.name}</div><div className="team-name-sub">Pot {assignment.team.pot}</div></div><div className="team-code">{assignment.team.code}</div><div className="team-owner">{assignment.participant.name}</div><Status status={assignment.team.status} /></div>;
+  return <div className={`team-row ${assignment.team.status === "eliminated" ? "eliminated" : ""}`}><div className="team-flag"><TeamMark flag={assignment.team.flag} name={assignment.team.name} /></div><div><div className="team-name">{assignment.team.name}</div><div className="team-name-sub">Pot {assignment.team.pot}</div></div><div className="team-code">{assignment.team.code}</div><div className="team-owner">{assignment.participant.name}</div><Status status={assignment.team.status} /></div>;
 }
 
 function SurvivalBoard({ assignments }) {
   const stages = ["winner", "runner-up", "semi", "quarter", "r16", "r32", "group", "active"];
-  return <div className="survival-board">{stages.map((stage) => { const rows = assignments.filter((a) => a.team.status === stage); if (!rows.length) return null; return <div className="survival-column" key={stage}><h3>{stageLabel(stage)}</h3>{rows.slice(0, 8).map((a) => <div className="survival-row" key={a.id}><span>{a.team.flag}</span><b>{a.participant.name}</b><em>{a.team.name}</em></div>)}{rows.length > 8 && <small>+{rows.length - 8} more</small>}</div>; })}</div>;
+  return <div className="survival-board">{stages.map((stage) => { const rows = assignments.filter((a) => a.team.status === stage); if (!rows.length) return null; return <div className="survival-column" key={stage}><h3>{stageLabel(stage)}</h3>{rows.slice(0, 8).map((a) => <div className="survival-row" key={a.id}><span><TeamMark flag={a.team.flag} name={a.team.name} /></span><b>{a.participant.name}</b><em>{a.team.name}</em></div>)}{rows.length > 8 && <small>+{rows.length - 8} more</small>}</div>; })}</div>;
 }
 
+function TeamMark({ flag, name }) {
+  if (String(flag || "").startsWith("http")) return <img className="team-crest" src={flag} alt={`${name} crest`} loading="lazy" />;
+  return <>{flag || "🏳️"}</>;
+}
+function flagText(flag) { return String(flag || "").startsWith("http") ? "🌐" : (flag || "🏳️"); }
 function Status({ status }) { return <span className={`status-badge ${status}`}>{stageLabel(status)}</span>; }
 function Stat({ value, label, gold }) { return <div className="stat-pill"><div className={`stat-pill-num ${gold ? "gold" : ""}`}>{value}</div><div className="stat-pill-label">{label}</div></div>; }
 function Info({ icon, title, desc }) { return <div className="info-strip-card"><div className="info-strip-icon">{icon}</div><div className="info-strip-title">{title}</div><div className="info-strip-desc">{desc}</div></div>; }

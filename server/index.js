@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fetchFootballDataMatches } from "./football-data.js";
 import { buildTeleSummary } from "./tele-summary.js";
-import { addParticipant, createDraw, createTeleSummary, exportBackupJson, exportNotJoinedCsv, exportParticipantsCsv, getState, importAllowlist, initDb, lookupEmployee, recordProviderSync, removeMatch, removeParticipant, resetSweepstake, revealAll, revealNext, syncFootballDataMatches, updateTeam, upsertMatch } from "./db.js";
+import { addParticipant, createDraw, createTeleSummary, exportBackupJson, exportNotJoinedCsv, exportParticipantsCsv, getState, importAllowlist, importFootballDataTeams, initDb, lookupEmployee, recordProviderSync, removeMatch, removeParticipant, resetSweepstake, revealAll, revealNext, syncFootballDataMatches, updateTeam, upsertMatch } from "./db.js";
 
 const app = express();
 const port = Number(process.env.PORT || 8097);
@@ -53,6 +53,21 @@ app.patch("/api/teams/:id", requireAdmin, wrap((req, res) => { updateTeam(req.pa
 app.post("/api/draw", requireAdmin, wrap((req, res) => { createDraw(req.body?.seed); res.status(201).json(getState()); }));
 app.post("/api/reveal-next", requireAdmin, wrap((req, res) => { revealNext(); res.json(getState()); }));
 app.post("/api/reveal-all", requireAdmin, wrap((req, res) => { revealAll(); res.json(getState()); }));
+app.post("/api/providers/football-data/import-teams", requireAdmin, wrap(async (req, res) => {
+  const result = await fetchFootballDataMatches({
+    apiKey: process.env.FOOTBALL_DATA_API_KEY,
+    competition: process.env.FOOTBALL_DATA_COMPETITION || req.body?.competition || "WC",
+    season: process.env.FOOTBALL_DATA_SEASON || req.body?.season || "2026",
+    dateFrom: req.body?.dateFrom || "",
+    dateTo: req.body?.dateTo || ""
+  });
+  if (result.throttling.low) {
+    recordProviderSync("football-data", { status: "throttled", message: "Low Football-Data request budget; team import skipped.", requestsAvailable: result.throttling.requestsAvailable, resetSeconds: result.throttling.resetSeconds });
+    return res.status(429).json(getState());
+  }
+  importFootballDataTeams(result.payload.matches || [], result.throttling);
+  res.json(getState());
+}));
 app.post("/api/providers/football-data/sync", requireAdmin, wrap(async (req, res) => {
   const result = await fetchFootballDataMatches({
     apiKey: process.env.FOOTBALL_DATA_API_KEY,

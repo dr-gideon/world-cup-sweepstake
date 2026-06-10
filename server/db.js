@@ -287,6 +287,56 @@ export function removeMatch(id) {
   audit("Match removed", id);
 }
 
+export function importFootballDataTeams(matches, throttling = {}) {
+  if (currentDraw()) throw httpError(409, "Cannot replace teams after the draw has run. Reset first if this is still setup data.");
+  const unique = new Map();
+  for (const match of matches || []) {
+    for (const apiTeam of [match.homeTeam, match.awayTeam]) {
+      if (!apiTeam?.id || unique.has(apiTeam.id)) continue;
+      unique.set(apiTeam.id, {
+        id: `fd_${apiTeam.id}`,
+        name: apiTeam.name || apiTeam.shortName || apiTeam.tla || `Team ${apiTeam.id}`,
+        code: String(apiTeam.tla || apiTeam.shortName || apiTeam.name || "TBD").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 3) || "TBD",
+        flag: apiTeam.crest || "🏳️",
+        status: "active",
+        note: `Football-Data team ${apiTeam.id}`
+      });
+    }
+  }
+  const teams = [...unique.values()].sort((a, b) => a.name.localeCompare(b.name));
+  if (teams.length !== 48) {
+    recordProviderSync("football-data", {
+      status: "team-import-blocked",
+      message: `Expected 48 teams from Football-Data WC matches, found ${teams.length}.`,
+      requestsAvailable: throttling.requestsAvailable,
+      resetSeconds: throttling.resetSeconds,
+      imported: 0,
+      skipped: Math.max(0, 48 - teams.length)
+    });
+    throw httpError(409, `Expected 48 teams from Football-Data WC matches, found ${teams.length}.`);
+  }
+  db.exec("BEGIN");
+  try {
+    db.exec("DELETE FROM matches; DELETE FROM assignments; DELETE FROM draws; DELETE FROM teams;");
+    const insert = db.prepare("INSERT INTO teams (id, name, code, flag, pot, status, note) VALUES (?, ?, ?, ?, ?, ?, ?)");
+    teams.forEach((team, index) => insert.run(team.id, team.name, team.code, team.flag, Math.floor(index / 12) + 1, team.status, team.note));
+    audit("Football-Data teams imported", "48 World Cup teams imported from fixtures");
+    recordProviderSync("football-data", {
+      status: "teams-imported",
+      message: "Imported 48 World Cup teams from Football-Data fixtures.",
+      requestsAvailable: throttling.requestsAvailable,
+      resetSeconds: throttling.resetSeconds,
+      imported: 48,
+      skipped: 0
+    });
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+  return { imported: 48, skipped: 0 };
+}
+
 export function syncFootballDataMatches(matches, throttling = {}) {
   const teams = db.prepare("SELECT id, name, code, flag FROM teams").all();
   let imported = 0;

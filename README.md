@@ -171,7 +171,7 @@ Rules:
 
 ## Match Data Provider Direction
 
-Current provider supports manual SQLite entry via Admin plus optional Football-Data sync. Football-Data sync reads `FOOTBALL_DATA_API_KEY`, defaults to competition `WC` and season `2026`, records rate-limit headers where provided, and skips API matches whose teams cannot be safely matched to local sweepstake team slots. Manual entry remains the fallback.
+Current provider supports manual SQLite entry via Admin plus optional Football-Data sync. Football-Data sync reads `FOOTBALL_DATA_API_KEY`, defaults to competition `WC` and season `2026`, records rate-limit headers where provided, can import the confirmed 48 teams from fixtures before the draw, and skips API matches whose teams cannot be safely matched to local sweepstake team slots. Manual entry remains the fallback.
 
 Tele summaries can be generated from local state. If `OPENAI_API_KEY` is configured, the app uses it and caches the result in SQLite. Without an LLM key, it uses deterministic fallback copy.
 
