@@ -1,42 +1,58 @@
-# MVP — World Cup Sweepstake
+# STATUS.md
 
-## Users
+## Status
 
-- Participant: joins the sweepstake and views assigned team(s).
-- Admin: manages registration, runs the draw, updates results.
-- Office viewer: watches the draw or leaderboard on a shared screen.
+MVP built and pushed.
 
-## Core Flow
+GitHub: https://github.com/dr-gideon/world-cup-sweepstake
 
-1. Admin opens registration.
-2. Participants enter name and optional department.
-3. Admin closes registration.
-4. App assigns all 48 World Cup teams fairly across participants.
-5. Big-screen draw reveals assignments.
-6. Public board shows team ownership.
-7. Admin updates champion and runner-up at the end.
-8. Prize winners are displayed.
+## Current Direction
 
-## Draw Rules
+Small polished local-first React/Vite app for an office 2026 World Cup sweepstake:
 
-- Every participant receives at least one team.
-- All 48 teams are assigned.
-- If participants < 48, bonus teams are randomly distributed.
-- If participants > 48, the MVP blocks the draw until extra entries are removed or shared/team-pair rules are agreed.
-- Future enhancement: use pots to balance favourites, strong teams, mid-tier teams, and outsiders.
+- free entry
+- CEO-sponsored prizes
+- €50 for winning team owner
+- €30 for runner-up team owner
+- all 48 teams assigned
+- bonus-team allocation if fewer than 48 people join
+- draw blocked if more than 48 participants join until shared-team rules are agreed
+- big-screen reveal and live ownership board
+- manual tournament result updates
 
-## MVP Screens
+## Implemented
 
-- Landing / join page
-- Admin dashboard
-- Draw setup page
-- Animated reveal page
-- Team ownership board
-- Prize outcome page
+- Participant registration with optional department.
+- Admin registration open/close.
+- Fair seeded draw logic.
+- 48 editable team slots with pots and statuses.
+- Live reveal screen.
+- Public searchable team board.
+- Prize cards for champion and runner-up owners.
+- Local JSON import/export.
+- LocalStorage persistence.
+- Draw tests for uniqueness, everyone-gets-one, balanced bonus spread, and >48 blocking.
+- Resolve-inspired visual theme.
 
-## Out of Scope for MVP
+## Verification
 
-- Payments or buy-ins
-- Live sports API integration
-- Authentication beyond a simple admin passcode
-- Complex prediction game
+Latest local gates:
+
+- `npm test` — passed
+- `npm run build` — passed
+- served Vite app responded on localhost via curl
+
+## Next Steps
+
+1. Optional: deploy internally after approval.
+2. Optional: add shared-team mode if all 52 colleagues want to join.
+3. Optional: replace qualifier placeholders when the 2026 field is final.
+4. Optional: add CSV participant import.
+
+## Operating Notes
+
+- Keep it simple and office-friendly.
+- No payment/buy-in handling.
+- No paid sports API.
+- Prefer manual result updates for MVP unless live sports API is approved later.
+- Export a backup before the real office draw.
