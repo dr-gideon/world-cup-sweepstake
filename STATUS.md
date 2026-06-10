@@ -2,37 +2,41 @@
 
 ## Status
 
-MVP built and pushed.
+Modern SQLite-backed MVP built and pushed.
 
 GitHub: https://github.com/dr-gideon/world-cup-sweepstake
 
+Archived previous build:
+
+```text
+mvp-resolve-dashboard-2026-06-10
+```
+
 ## Current Direction
 
-Small polished local-first React/Vite app for an office 2026 World Cup sweepstake:
+Fun office sweepstake experience, not a dashboard:
 
-- free entry
-- CEO-sponsored prizes
-- €50 for winning team owner
-- €30 for runner-up team owner
-- all 48 teams assigned
-- bonus-team allocation if fewer than 48 people join
-- draw blocked if more than 48 participants join until shared-team rules are agreed
-- big-screen reveal and live ownership board
-- manual tournament result updates
+- Resolve colour influence only
+- modern dark/magenta/gold event UI
+- exciting ticket-style entry flow
+- big reveal stage
+- public team board
+- SQLite shared state
+- Windows-server-friendly Express app
 
 ## Implemented
 
-- Participant registration with optional department.
-- Admin registration open/close.
-- Fair seeded draw logic.
-- 48 editable team slots with pots and statuses.
-- Live reveal screen.
-- Public searchable team board.
-- Prize cards for champion and runner-up owners.
-- Local JSON import/export.
-- LocalStorage persistence.
-- Draw tests for uniqueness, everyone-gets-one, balanced bonus spread, and >48 blocking.
-- Resolve-inspired visual theme.
+- Express API.
+- SQLite database using Node built-in `node:sqlite`.
+- 48 seeded editable World Cup team slots.
+- Participant registration stored in SQLite.
+- Draw creation persisted in SQLite.
+- Reveal-next and reveal-all persisted in SQLite.
+- Manual team status updates persisted in SQLite.
+- Reset endpoint.
+- Modern React frontend.
+- Entry screen, reveal stage, team board, admin booth.
+- Existing draw tests still pass.
 
 ## Verification
 
@@ -40,19 +44,24 @@ Latest local gates:
 
 - `npm test` — passed
 - `npm run build` — passed
-- served Vite app responded on localhost via curl
+- full-stack smoke check with temporary SQLite DB — passed
+  - `/api/state`
+  - add participants
+  - create draw
+  - reveal next
+  - serve built frontend
 
 ## Next Steps
 
-1. Optional: deploy internally after approval.
-2. Optional: add shared-team mode if all 52 colleagues want to join.
-3. Optional: replace qualifier placeholders when the 2026 field is final.
-4. Optional: add CSV participant import.
+1. Optional: add CSV participant import.
+2. Optional: add shared-team mode for >48 participants.
+3. Optional: add LLM banter summaries via approved backend key.
+4. Optional: package as a Windows service.
+5. Optional: deploy internally after approval.
 
 ## Operating Notes
 
-- Keep it simple and office-friendly.
-- No payment/buy-in handling.
-- No paid sports API.
-- Prefer manual result updates for MVP unless live sports API is approved later.
-- Export a backup before the real office draw.
+- Start server with `node --experimental-sqlite server/index.js` via `npm start`.
+- Default port: `8097`.
+- Default DB path: `data/sweepstake.sqlite`.
+- No paid API or LLM wired yet.
