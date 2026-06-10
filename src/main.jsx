@@ -282,20 +282,18 @@ function TeamsPage({ state }) {
 
 function TelePage({ state }) {
   const impacts = (state.audit || []).filter((event) => event.event === "Match impact");
-  const latest = impacts[0];
-  const alive = (state.assignments || []).filter((a) => a.team.status !== "eliminated");
-  const out = (state.assignments || []).filter((a) => a.team.status === "eliminated");
-  const prizes = usePrizes(state);
+  const summaries = state.teleSummaries || [];
   return <main className="page tele-page">
-    <div className="tele-frame">
-      <div className="tele-top"><span>LIVE FROM THE OFFICE DRAW ROOM</span><b>WORLD CUP SWEEPSTAKE</b><span>{new Date().toLocaleTimeString("en-IE", { hour: "2-digit", minute: "2-digit" })}</span></div>
-      <section className="tele-hero"><div><div className="hero-eyebrow">Post-match impact</div><h1 className="hero-title tele-title">{state.teleSummary?.headline || (latest ? impactHeadline(latest.detail) : "No drama yet.")}</h1><p>{state.teleSummary?.body || (latest ? latest.detail : "Update team statuses in Admin after each match and this screen becomes the office broadcast.")}</p></div><div className="scorebug"><strong>{alive.length}</strong><span>Alive</span><strong>{out.length}</strong><span>Out</span></div></section>
-      <div className="tele-grid"><div className="tele-card"><div className="section-label">Prize race</div><Prize icon="🥇" amount="€50" label="Champion" text={prizes.winner ? `${prizes.winner.participant.name} — ${prizes.winner.team.name}` : "Waiting"} /><Prize icon="🥈" amount="€30" label="Runner-up" text={prizes.runnerUp ? `${prizes.runnerUp.participant.name} — ${prizes.runnerUp.team.name}` : "Waiting"} /></div><div className="tele-card"><div className="section-label">Latest matches</div><TeleMatches matches={state.matches || []} /></div></div>
-      <div className="tele-grid"><div className="tele-card wide-card"><div className="section-label">Drama feed</div>{(state.teleSummaries || []).length ? state.teleSummaries.slice(0, 6).map((summary) => <div className="impact-row" key={summary.id}><b>{summary.headline}</b><span>{summary.body}</span><em>{summary.provider}</em></div>) : impacts.length ? impacts.slice(0, 6).map((impact, i) => <div className="impact-row" key={i}><b>{impactHeadline(impact.detail)}</b><span>{impact.detail}</span></div>) : <Empty icon="📺" title="No match impacts" desc="Change team statuses after matches." />}</div></div>
-      <SurvivalBoard assignments={state.assignments || []} />
+    <div className="tele-frame tv-lite">
+      <div className="tele-top"><span>OFFICE WORLD CUP SWEEPSTAKE</span><b>FIXTURES + DRAMA</b><span>{new Date().toLocaleTimeString("en-IE", { hour: "2-digit", minute: "2-digit" })}</span></div>
+      <section className="tv-board">
+        <div className="tele-card fixtures-card"><div className="section-label">Fixtures & results</div><TeleMatches matches={state.matches || []} /></div>
+        <div className="tele-card drama-card"><div className="section-label">Drama feed</div>{summaries.length ? summaries.slice(0, 5).map((summary) => <div className="impact-row roast-row" key={summary.id}><b>{summary.headline}</b><span>{summary.body}</span></div>) : impacts.length ? impacts.slice(0, 5).map((impact, i) => <div className="impact-row roast-row" key={i}><b>{impactHeadline(impact.detail)}</b><span>{impact.detail}</span></div>) : <Empty icon="📺" title="No drama yet" desc="Once results land, this screen will start causing HR-manageable trouble." />}</div>
+      </section>
     </div>
   </main>;
 }
+
 
 function AdminGate({ authed, setAuthed, refresh, children }) {
   const [username, setUsername] = useState("admin");

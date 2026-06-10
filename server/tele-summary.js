@@ -1,8 +1,8 @@
 export async function buildMatchDramaSummary({ match, providerConfig = {} }) {
   const sourceKey = `match:${match.id}:${match.status}:${match.homeScore ?? ""}:${match.awayScore ?? ""}`;
   const fallback = {
-    headline: `${match.homeCode} ${scoreText(match)} ${match.awayCode}`,
-    body: `${match.stage} result: ${match.homeName} ${scoreText(match)} ${match.awayName}. The office sweepstake board has another result to chew on.`
+    headline: `${match.homeCode} ${scoreText(match)} ${match.awayCode}: someone check on the ${match.awayCode} owner`,
+    body: `${match.homeName} nicked it ${scoreText(match)} against ${match.awayName}. Not a disaster, unless your name is attached to ${match.awayName}, in which case: thoughts and prayers.`
   };
   return generateSummary({ sourceKey, fallback, context: { match }, providerConfig });
 }
@@ -18,8 +18,9 @@ async function generateSummary({ sourceKey, fallback, context, providerConfig })
   if (!config.key) return { sourceKey, ...fallback, provider: "fallback" };
   try {
     const prompt = [
-      "Write a short office-safe World Cup sweepstake TV drama summary.",
-      "Tone: fun, sharp, but kind. No profanity. Do not invent facts.",
+      "Write one short office-TV World Cup sweepstake roast for colleagues checking scores.",
+      "Tone: funny, sarcastic, mildly insulting, dry, Irish/UK office banter. No profanity, slurs, cruelty, HR disasters, or invented facts.",
+      "Make it punchy: headline max 12 words, body max 35 words. Tease the losing team owner or lucky winner if present.",
       "Return JSON only with keys headline and body.",
       `Context: ${JSON.stringify(context).slice(0, 5000)}`
     ].join("\n");
@@ -32,7 +33,7 @@ async function generateSummary({ sourceKey, fallback, context, providerConfig })
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content || "";
     const parsed = JSON.parse(extractJson(content));
-    return { sourceKey, headline: String(parsed.headline || fallback.headline).slice(0, 120), body: String(parsed.body || fallback.body).slice(0, 360), provider: config.provider };
+    return { sourceKey, headline: String(parsed.headline || fallback.headline).slice(0, 100), body: String(parsed.body || fallback.body).slice(0, 240), provider: config.provider };
   } catch {
     return { sourceKey, ...fallback, provider: "fallback" };
   }
@@ -77,13 +78,14 @@ function fallbackSummary(state) {
   const winner = state.assignments?.find((assignment) => assignment.team.status === "winner");
   const runner = state.assignments?.find((assignment) => assignment.team.status === "runner-up");
   if (winner) return { headline: `${winner.participant.name} is in the €50 seat`, body: `${winner.team.flag} ${winner.team.name} are marked champion. The office prize race has a leader.` };
-  if (latestMatch) return { headline: `${latestMatch.homeCode} ${scoreText(latestMatch)} ${latestMatch.awayCode}`, body: `${latestMatch.stage} update: ${latestMatch.homeName} vs ${latestMatch.awayName}. ${runner ? `${runner.participant.name} is tracking the runner-up prize.` : "Prize positions are still waiting for the final."}` };
+  if (latestMatch) return { headline: `${latestMatch.homeCode} ${scoreText(latestMatch)} ${latestMatch.awayCode}: office bragging rights updated`, body: `${latestMatch.homeName} vs ${latestMatch.awayName}. Someone is pretending not to care. Nobody believes them.` };
   return { headline: "No drama yet", body: "Add fixtures or update team statuses and the Tele screen will turn them into office sweepstake headlines." };
 }
 
 function compactContext(state) {
   return {
     matches: (state.matches || []).slice(-6),
+    assignments: (state.assignments || []).map((assignment) => ({ participant: assignment.participant.name, team: assignment.team.name, status: assignment.team.status })).slice(0, 80),
     impacts: (state.audit || []).filter((event) => event.event === "Match impact").slice(0, 6),
     prizes: {
       winner: state.assignments?.find((assignment) => assignment.team.status === "winner") || null,
