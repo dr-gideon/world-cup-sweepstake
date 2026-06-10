@@ -360,15 +360,16 @@ export function syncFootballDataMatches(matches, throttling = {}) {
     });
     imported += 1;
   }
+  const statusUpdates = applyKnockoutStatusUpdates(matches || []);
   recordProviderSync("football-data", {
     status: "ok",
-    message: `Imported ${imported}, skipped ${skipped}`,
+    message: `Imported ${imported}, skipped ${skipped}, status updates ${statusUpdates}`,
     requestsAvailable: throttling.requestsAvailable,
     resetSeconds: throttling.resetSeconds,
     imported,
     skipped
   });
-  return { imported, skipped };
+  return { imported, skipped, statusUpdates };
 }
 
 export function recordProviderSync(provider, result) {
@@ -419,6 +420,63 @@ function normaliseFootballStatus(status) {
 
 function normaliseFootballStage(stage) {
   return String(stage || "Group").replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function applyKnockoutStatusUpdates(apiMatches) {
+  const teams = db.prepare("SELECT id, name, code, flag, status FROM teams").all();
+  let updates = 0;
+  for (const match of apiMatches) {
+    if (match.status !== "FINISHED" && match.status !== "AWARDED") continue;
+    const stage = String(match.stage || "");
+    if (!isKnockoutStage(stage)) continue;
+    const home = mapFootballDataTeam(match.homeTeam, teams);
+    const away = mapFootballDataTeam(match.awayTeam, teams);
+    if (!home || !away) continue;
+    const homeScore = match.score?.fullTime?.home ?? match.score?.regularTime?.home;
+    const awayScore = match.score?.fullTime?.away ?? match.score?.regularTime?.away;
+    if (homeScore === null || homeScore === undefined || awayScore === null || awayScore === undefined || homeScore === awayScore) continue;
+    const winner = homeScore > awayScore ? home : away;
+    const loser = homeScore > awayScore ? away : home;
+    if (stage === "FINAL") {
+      updates += updateTeamStatusIfChanged(winner.id, "winner");
+      updates += updateTeamStatusIfChanged(loser.id, "runner-up");
+    } else {
+      updates += updateTeamStatusIfChanged(loser.id, "eliminated");
+      const nextStatus = stageToSurvivorStatus(stage);
+      if (nextStatus) updates += updateTeamStatusIfChanged(winner.id, nextStatus);
+    }
+  }
+  return updates;
+}
+
+function isKnockoutStage(stage) {
+  return ["LAST_32", "LAST_16", "QUARTER_FINALS", "SEMI_FINALS", "FINAL", "THIRD_PLACE"].includes(stage);
+}
+
+function stageToSurvivorStatus(stage) {
+  if (stage === "LAST_32") return "r16";
+  if (stage === "LAST_16") return "quarter";
+  if (stage === "QUARTER_FINALS") return "semi";
+  if (stage === "SEMI_FINALS") return "active";
+  return "active";
+}
+
+function updateTeamStatusIfChanged(teamId, status) {
+  const current = db.prepare("SELECT id, name, flag, status FROM teams WHERE id = ?").get(teamId);
+  if (!current || current.status === status) return 0;
+  db.prepare("UPDATE teams SET status = ? WHERE id = ?").run(status, teamId);
+  const owner = db.prepare(`
+    SELECT p.name, p.department
+    FROM assignments a
+    JOIN participants p ON p.id = a.participant_id
+    JOIN draws d ON d.id = a.draw_id
+    WHERE a.team_id = ?
+    ORDER BY d.created_at DESC
+    LIMIT 1
+  `).get(teamId);
+  const ownerText = owner ? `${owner.name}${owner.department ? ` · ${owner.department}` : ""}` : "No owner yet";
+  audit("Match impact", `${current.flag} ${current.name}: ${current.status} → ${status} | ${ownerText}`);
+  return 1;
 }
 
 export function importAllowlist(csvText) {

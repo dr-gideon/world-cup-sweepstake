@@ -13,6 +13,7 @@ const indexPath = resolve(distPath, "index.html");
 const sessions = new Map();
 const adminUser = process.env.ADMIN_USER || "admin";
 const adminPassword = process.env.ADMIN_PASSWORD;
+const scheduler = { enabled: process.env.FOOTBALL_DATA_AUTO_SYNC === "1", running: false, lastRunAt: "", lastMessage: "", timer: null };
 
 if (!adminPassword) {
   console.error("ADMIN_PASSWORD is required. Set a strong admin password before starting the server.");
@@ -22,7 +23,7 @@ if (!adminPassword) {
 initDb();
 app.use(express.json({ limit: "1mb" }));
 
-app.get("/api/state", (req, res) => res.json(getState()));
+app.get("/api/state", (req, res) => res.json({ ...getState(), scheduler: schedulerStatus() }));
 app.get("/api/auth/status", (req, res) => res.json({ authenticated: Boolean(getSession(req)) }));
 app.post("/api/auth/login", wrap((req, res) => {
   const { username, password } = req.body || {};
@@ -69,19 +70,8 @@ app.post("/api/providers/football-data/import-teams", requireAdmin, wrap(async (
   res.json(getState());
 }));
 app.post("/api/providers/football-data/sync", requireAdmin, wrap(async (req, res) => {
-  const result = await fetchFootballDataMatches({
-    apiKey: process.env.FOOTBALL_DATA_API_KEY,
-    competition: process.env.FOOTBALL_DATA_COMPETITION || req.body?.competition || "WC",
-    season: process.env.FOOTBALL_DATA_SEASON || req.body?.season || "2026",
-    dateFrom: req.body?.dateFrom || "",
-    dateTo: req.body?.dateTo || ""
-  });
-  if (result.throttling.low) {
-    recordProviderSync("football-data", { status: "throttled", message: "Low Football-Data request budget; sync skipped.", requestsAvailable: result.throttling.requestsAvailable, resetSeconds: result.throttling.resetSeconds });
-    return res.status(429).json(getState());
-  }
-  syncFootballDataMatches(result.payload.matches || [], result.throttling);
-  res.json(getState());
+  await runFootballDataSync({ dateFrom: req.body?.dateFrom || "", dateTo: req.body?.dateTo || "", manual: true });
+  res.json({ ...getState(), scheduler: schedulerStatus() });
 }));
 app.post("/api/tele-summary/generate", requireAdmin, wrap(async (req, res) => {
   const summary = await buildTeleSummary({ state: getState(), openAiKey: process.env.OPENAI_API_KEY || "", model: process.env.OPENAI_MODEL || "gpt-4o-mini" });
@@ -110,7 +100,56 @@ app.use((err, req, res, next) => {
 
 app.listen(port, "0.0.0.0", () => {
   console.log(`World Cup Sweepstake server listening on http://0.0.0.0:${port}`);
+  startFootballDataScheduler();
 });
+
+function startFootballDataScheduler() {
+  if (!scheduler.enabled) return;
+  if (!process.env.FOOTBALL_DATA_API_KEY) {
+    scheduler.lastMessage = "FOOTBALL_DATA_AUTO_SYNC enabled but FOOTBALL_DATA_API_KEY is missing.";
+    console.warn(scheduler.lastMessage);
+    return;
+  }
+  const intervalMinutes = Math.max(5, Number(process.env.FOOTBALL_DATA_SYNC_INTERVAL_MINUTES || 15));
+  scheduler.lastMessage = `Football-Data auto-sync enabled every ${intervalMinutes} minutes.`;
+  scheduler.timer = setInterval(() => runFootballDataSync({ manual: false }).catch((error) => {
+    scheduler.lastMessage = error.message;
+    console.warn("Football-Data auto-sync failed:", error.message);
+  }), intervalMinutes * 60 * 1000);
+}
+
+async function runFootballDataSync({ dateFrom = "", dateTo = "", manual = false } = {}) {
+  if (scheduler.running) {
+    if (manual) throw Object.assign(new Error("Football-Data sync already running."), { status: 409 });
+    return;
+  }
+  scheduler.running = true;
+  try {
+    const result = await fetchFootballDataMatches({
+      apiKey: process.env.FOOTBALL_DATA_API_KEY,
+      competition: process.env.FOOTBALL_DATA_COMPETITION || "WC",
+      season: process.env.FOOTBALL_DATA_SEASON || "2026",
+      dateFrom,
+      dateTo
+    });
+    if (result.throttling.low) {
+      recordProviderSync("football-data", { status: "throttled", message: "Low Football-Data request budget; sync skipped.", requestsAvailable: result.throttling.requestsAvailable, resetSeconds: result.throttling.resetSeconds });
+      scheduler.lastRunAt = new Date().toISOString();
+      scheduler.lastMessage = "Skipped sync due to low Football-Data request budget.";
+      if (manual) throw Object.assign(new Error(scheduler.lastMessage), { status: 429 });
+      return;
+    }
+    const sync = syncFootballDataMatches(result.payload.matches || [], result.throttling);
+    scheduler.lastRunAt = new Date().toISOString();
+    scheduler.lastMessage = `Imported ${sync.imported}, skipped ${sync.skipped}, status updates ${sync.statusUpdates || 0}.`;
+  } finally {
+    scheduler.running = false;
+  }
+}
+
+function schedulerStatus() {
+  return { enabled: scheduler.enabled, running: scheduler.running, lastRunAt: scheduler.lastRunAt, lastMessage: scheduler.lastMessage };
+}
 
 function requireAdmin(req, res, next) {
   if (!getSession(req)) return res.status(401).json({ error: "Admin login required." });

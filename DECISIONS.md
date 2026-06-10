@@ -123,3 +123,10 @@ Rationale: This adds the live-data/LLM path without making the app dependent on 
 Decision: Add an Admin `Import teams` action that fetches Football-Data WC fixtures, extracts the 48 unique teams, replaces local placeholder team slots before the draw, and stores crest URLs for UI display. The action is blocked once a draw exists.
 
 Rationale: The confirmed World Cup team list and fixtures are available from Football-Data, so the app should not require manual entry of all teams. Blocking after draw protects existing assignments.
+
+
+## 2026-06-10 — Add Football-Data auto-sync and safe knockout status updates
+
+Decision: Add an optional in-app Football-Data scheduler controlled by env vars, and derive team statuses only from finished knockout/final matches.
+
+Rationale: Tele should update without manual sync during the tournament, but group-stage elimination has standings/tiebreaker complexity. Knockout losers/champion/runner-up are safe to derive from finished match results.

@@ -238,3 +238,12 @@ A clean clone production-style dry-run passed on temp port `8108` with temp DB:
 - Blocks team replacement after the draw has run.
 - Stores crest URLs in the existing team flag field and renders them as images where appropriate.
 - Live smoke with temp key imported 48 teams; subsequent match sync imported 72 matches and skipped 32 unmatched/TBD provider entries.
+
+## Football-Data Auto-sync
+
+- Added optional in-app scheduler.
+- Env vars: `FOOTBALL_DATA_AUTO_SYNC=1`, `FOOTBALL_DATA_SYNC_INTERVAL_MINUTES=15`.
+- Minimum interval is clamped to 5 minutes.
+- Scheduler respects low request budget by skipping sync when `X-RequestsAvailable <= 2`.
+- Admin shows scheduler enabled/running/last message.
+- Automatic status derivation is limited to knockout/final matches. Group-stage elimination remains manual/safe.
