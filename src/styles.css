@@ -214,3 +214,12 @@ input::placeholder { color: #a996a8; }
   .broadcast-topline { grid-template-columns: 1fr; text-align: center; }
   .broadcast-topline em { justify-self: center; }
 }
+.form-note.success { color: #11613a; background: #dff6ea; }
+.quiet-form-btn { min-height: 42px; border: 1px solid #eadde8; border-radius: 999px; background: #fff; color: var(--primary-dark); font-weight: 950; }
+.allowlist-stats { display: grid; grid-template-columns: repeat(3, auto 1fr); gap: 3px 8px; align-items: baseline; margin: 14px 0; }
+.allowlist-stats strong { color: white; font-size: 28px; line-height: 1; }
+.allowlist-stats span { color: rgba(255,255,255,.66); font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; }
+.file-picker { display: inline-flex; width: 100%; min-height: 44px; align-items: center; justify-content: center; border-radius: 999px; border: 1px solid rgba(255,255,255,.22); background: rgba(255,255,255,.12); color: white; margin: 10px 0; }
+.file-picker input { display: none; }
+.csv-box { width: 100%; min-height: 140px; resize: vertical; border-radius: 18px; border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.92); color: var(--ink); padding: 12px; font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+@media (max-width: 720px) { .allowlist-stats { grid-template-columns: auto 1fr; } }

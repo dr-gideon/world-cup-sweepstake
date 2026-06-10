@@ -13,8 +13,16 @@ db.exec("PRAGMA foreign_keys = ON");
 
 export function initDb() {
   db.exec(`
+    CREATE TABLE IF NOT EXISTS allowed_employees (
+      email TEXT PRIMARY KEY,
+      name TEXT NOT NULL DEFAULT '',
+      department TEXT NOT NULL DEFAULT '',
+      uploaded_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS participants (
       id TEXT PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
       name TEXT NOT NULL,
       department TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL
@@ -74,29 +82,46 @@ export function audit(event, detail = "") {
 }
 
 export function getState() {
+  ensureParticipantEmailColumn();
   const participants = db.prepare("SELECT id, name, department, created_at AS createdAt FROM participants ORDER BY created_at ASC").all();
   const teams = db.prepare("SELECT id, name, code, flag, pot, status, note FROM teams ORDER BY rowid ASC").all();
   const draw = db.prepare("SELECT id, seed, created_at AS createdAt, reveal_index AS revealIndex FROM draws ORDER BY created_at DESC LIMIT 1").get() || null;
   const rawAssignments = draw ? db.prepare("SELECT id, team_id AS teamId, participant_id AS participantId, draw_index AS drawIndex, revealed FROM assignments WHERE draw_id = ? ORDER BY draw_index ASC").all(draw.id).map((assignment) => ({ ...assignment, revealed: Boolean(assignment.revealed) })) : [];
   const assignments = hydrateAssignments(rawAssignments, participants, teams);
   const auditEvents = db.prepare("SELECT at, event, detail FROM audit_events ORDER BY id DESC LIMIT 20").all();
+  const allowlistStats = getAllowlistStats();
   return {
     registrationOpen: !draw,
     participants,
     teams,
     draw: draw ? { ...draw, assignments: rawAssignments } : null,
     assignments,
-    audit: auditEvents
+    audit: auditEvents,
+    allowlist: allowlistStats
   };
 }
 
-export function addParticipant({ name, department = "" }) {
-  const cleanName = String(name || "").trim().replace(/\s+/g, " ");
-  const cleanDepartment = String(department || "").trim().replace(/\s+/g, " ");
-  if (!cleanName) throw httpError(400, "Name is required.");
+export function addParticipant({ email, name, department = "" }) {
+  ensureParticipantEmailColumn();
+  const cleanEmail = normaliseEmail(email);
+  if (!cleanEmail) throw httpError(400, "Work email is required.");
   if (currentDraw()) throw httpError(409, "The draw is locked. Reset before changing participants.");
-  const participant = { id: crypto.randomUUID(), name: cleanName, department: cleanDepartment, createdAt: new Date().toISOString() };
-  db.prepare("INSERT INTO participants (id, name, department, created_at) VALUES (?, ?, ?, ?)").run(participant.id, participant.name, participant.department, participant.createdAt);
+
+  const allowlistCount = db.prepare("SELECT COUNT(*) AS count FROM allowed_employees").get().count;
+  if (!allowlistCount) throw httpError(409, "Upload the employee email list before opening registration.");
+
+  const allowed = db.prepare("SELECT email, name, department FROM allowed_employees WHERE email = ?").get(cleanEmail);
+  if (!allowed) throw httpError(403, "This email is not on the sweepstake list. Check spelling or ask the organiser.");
+
+  const existing = db.prepare("SELECT id FROM participants WHERE email = ?").get(cleanEmail);
+  if (existing) throw httpError(409, "Looks like this email is already in the draw.");
+
+  const cleanName = String(name || allowed.name || "").trim().replace(/\s+/g, " ");
+  const cleanDepartment = String(department || allowed.department || "").trim().replace(/\s+/g, " ");
+  if (!cleanName) throw httpError(400, "Name is required.");
+
+  const participant = { id: crypto.randomUUID(), email: cleanEmail, name: cleanName, department: cleanDepartment, createdAt: new Date().toISOString() };
+  db.prepare("INSERT INTO participants (id, email, name, department, created_at) VALUES (?, ?, ?, ?, ?)").run(participant.id, participant.email, participant.name, participant.department, participant.createdAt);
   audit("Participant joined", `${participant.name}${participant.department ? ` · ${participant.department}` : ""}`);
   return participant;
 }
@@ -136,6 +161,7 @@ export function updateTeam(id, patch) {
 }
 
 export function createDraw(seed = "office-2026") {
+  ensureParticipantEmailColumn();
   const participants = db.prepare("SELECT id, name, department, created_at AS createdAt FROM participants ORDER BY created_at ASC").all();
   const teams = db.prepare("SELECT id, name, code, flag, pot, status, note FROM teams ORDER BY rowid ASC").all();
   const draw = runDraw(participants, teams, seed);
@@ -171,7 +197,96 @@ export function revealAll() {
 
 export function resetSweepstake() {
   db.exec("DELETE FROM assignments; DELETE FROM draws; DELETE FROM participants; UPDATE teams SET status = 'active';");
-  audit("Sweepstake reset", "Participants, draw, and results cleared");
+  audit("Sweepstake reset", "Participants, draw, and results cleared. Employee allowlist kept.");
+}
+
+export function importAllowlist(csvText) {
+  if (currentDraw()) throw httpError(409, "The draw is locked. Reset before replacing the employee list.");
+  const rows = parseCsv(csvText);
+  if (!rows.length) throw httpError(400, "CSV is empty.");
+  const headers = rows[0].map((header) => header.trim().toLowerCase());
+  const emailIndex = headers.indexOf("email");
+  const nameIndex = headers.indexOf("name");
+  const departmentIndex = headers.indexOf("department");
+  if (emailIndex === -1) throw httpError(400, "CSV must include an email column.");
+
+  const seen = new Set();
+  const employees = [];
+  for (const row of rows.slice(1)) {
+    const email = normaliseEmail(row[emailIndex]);
+    if (!email || seen.has(email)) continue;
+    seen.add(email);
+    employees.push({
+      email,
+      name: String(row[nameIndex] || "").trim().replace(/\s+/g, " "),
+      department: String(row[departmentIndex] || "").trim().replace(/\s+/g, " ")
+    });
+  }
+  if (!employees.length) throw httpError(400, "No valid email addresses found.");
+
+  db.exec("BEGIN");
+  try {
+    db.exec("DELETE FROM participants; DELETE FROM allowed_employees;");
+    const insert = db.prepare("INSERT INTO allowed_employees (email, name, department, uploaded_at) VALUES (?, ?, ?, ?)");
+    const uploadedAt = new Date().toISOString();
+    for (const employee of employees) insert.run(employee.email, employee.name, employee.department, uploadedAt);
+    audit("Employee list uploaded", `${employees.length} eligible employees`);
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+  return getAllowlistStats();
+}
+
+export function lookupEmployee(email) {
+  const cleanEmail = normaliseEmail(email);
+  if (!cleanEmail) throw httpError(400, "Email is required.");
+  const employee = db.prepare("SELECT email, name, department FROM allowed_employees WHERE email = ?").get(cleanEmail);
+  const joined = db.prepare("SELECT id FROM participants WHERE email = ?").get(cleanEmail);
+  return {
+    allowed: Boolean(employee),
+    joined: Boolean(joined),
+    employee: employee ? { name: employee.name, department: employee.department } : null
+  };
+}
+
+function getAllowlistStats() {
+  const eligible = db.prepare("SELECT COUNT(*) AS count FROM allowed_employees").get().count;
+  const joined = db.prepare("SELECT COUNT(*) AS count FROM participants").get().count;
+  return { eligible, joined, remaining: Math.max(eligible - joined, 0), required: true };
+}
+
+function normaliseEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let quoted = false;
+  const input = String(text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  for (let i = 0; i < input.length; i += 1) {
+    const char = input[i];
+    const next = input[i + 1];
+    if (char === '"' && quoted && next === '"') { cell += '"'; i += 1; continue; }
+    if (char === '"') { quoted = !quoted; continue; }
+    if (char === ',' && !quoted) { row.push(cell); cell = ""; continue; }
+    if (char === "\n" && !quoted) { row.push(cell); if (row.some((v) => v.trim())) rows.push(row); row = []; cell = ""; continue; }
+    cell += char;
+  }
+  row.push(cell);
+  if (row.some((v) => v.trim())) rows.push(row);
+  return rows;
+}
+
+function ensureParticipantEmailColumn() {
+  const columns = db.prepare("PRAGMA table_info(participants)").all().map((column) => column.name);
+  if (!columns.includes("email")) {
+    db.exec("DELETE FROM participants; ALTER TABLE participants ADD COLUMN email TEXT NOT NULL DEFAULT '';");
+    db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_participants_email ON participants(email)");
+  }
 }
 
 function currentDraw() {

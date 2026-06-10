@@ -1,70 +1,162 @@
-# STATUS.md
+# World Cup Sweepstake
 
-## Status
+A fun office sweepstake app for the 2026 FIFA World Cup.
 
-Modern SQLite-backed MVP built and pushed.
+## Concept
 
-GitHub: https://github.com/dr-gideon/world-cup-sweepstake
+Free-entry, CEO-sponsored sweepstake with an exciting entry flow, live draw reveal, shared team board, and prize tracking.
 
-Archived previous build:
+Prize rules:
+
+- Champion team owner wins **€50**.
+- Runner-up team owner wins **€30**.
+- Entry is free for all participants.
+- If one participant owns both finalists, they may win both prizes.
+
+## Current Build
+
+The original Resolve-dashboard MVP is archived as git tag:
 
 ```text
 mvp-resolve-dashboard-2026-06-10
 ```
 
-## Current Direction
+The current app keeps the Resolve colour influence but switches to a modern event-style experience:
 
-Fun office sweepstake experience, not a dashboard:
+- “ticket” entry screen
+- animated draw-stage UI
+- exciting team reveal
+- searchable team board
+- admin booth for participants, teams, and results
+- Tele broadcast view for office screens after matches
+- SQLite-backed shared state
 
-- Resolve colour influence only
-- modern dark/magenta/gold event UI
-- exciting ticket-style entry flow
-- big reveal stage
-- public team board
-- Tele broadcast view for office screens
-- SQLite shared state
-- Windows-server-friendly Express app
+## Features
 
-## Implemented
+- Employee allowlist CSV upload.
+- Email-gated participant registration with one entry per employee email.
+- Public screens do not display employee email addresses.
+- Shared SQLite database instead of browser-only LocalStorage.
+- Fair draw across all 48 World Cup team slots.
+- Bonus teams distributed evenly when fewer than 48 people join.
+- Draw blocked if more than 48 people join until shared-team rules are agreed.
+- One-by-one reveal and reveal-all mode.
+- Public team board.
+- Tele view with post-match headline, drama feed, survival board, prize race, and ticker.
+- Editable qualifier team slots.
+- Manual tournament status updates.
+- Prize tracker for winner and runner-up.
+- JSON export from the UI.
 
-- Express API.
-- SQLite database using Node built-in `node:sqlite`.
-- 48 seeded editable World Cup team slots.
-- Participant registration stored in SQLite.
-- Draw creation persisted in SQLite.
-- Reveal-next and reveal-all persisted in SQLite.
-- Manual team status updates persisted in SQLite.
-- Reset endpoint.
-- Rich match-impact audit events on team status changes.
-- Modern React frontend.
-- Entry screen, reveal stage, team board, Tele broadcast view, admin booth.
-- Existing draw tests still pass.
+## Stack
 
-## Verification
+- React
+- Vite
+- Express
+- Node built-in SQLite (`node:sqlite`)
+- Node test runner
 
-Latest local gates:
+## Requirements
 
-- `npm test` — passed
-- `npm run build` — passed
-- full-stack smoke check with temporary SQLite DB — passed
-  - `/api/state`
-  - add participants
-  - create draw
-  - reveal next
-  - status update creates Match impact event
-  - serve built frontend
+- Node.js 22+ with `node:sqlite` available.
+- Start server commands with `--experimental-sqlite` while Node marks the module experimental.
 
-## Next Steps
+## Development
 
-1. Optional: add CSV participant import.
-2. Optional: add shared-team mode for >48 participants.
-3. Optional: add LLM banter summaries via approved backend key.
-4. Optional: package as a Windows service.
-5. Optional: deploy internally after approval.
+Terminal 1:
+
+```bash
+npm run dev:server
+```
+
+Terminal 2:
+
+```bash
+npm run dev
+```
+
+Open the Vite URL shown in the terminal.
+
+## Production / Windows Server
+
+Build the frontend:
+
+```bash
+npm install
+npm run build
+```
+
+Start the combined Express + SQLite server:
+
+```bash
+npm start
+```
+
+By default, the server listens on port `8097` and stores data in:
+
+```text
+data/sweepstake.sqlite
+```
+
+Optional environment variables:
+
+```text
+PORT=8097
+SWEEPSTAKE_DB=data/sweepstake.sqlite
+```
+
+On Windows, run the same commands in PowerShell after installing Node 22+.
+For a proper office deployment, run `npm start` as a Windows service with NSSM, PM2, or Task Scheduler.
+
+## Verify
+
+```bash
+npm test
+npm run build
+```
+
+Full-stack smoke check used during development:
+
+- build frontend
+- start Express with a temporary SQLite DB
+- call `/api/state`
+- add participants
+- run draw
+- reveal one pick
+- confirm built frontend is served
+
+## Employee CSV format
+
+Upload this in Admin before registration opens:
+
+```csv
+email,name,department
+alice@company.com,Alice Murphy,Sales
+bob@company.com,Bob Lee,Support
+```
+
+Rules:
+
+- `email` is required.
+- `name` and `department` are optional but recommended.
+- emails are normalized to lowercase.
+- duplicate emails in the CSV are ignored after the first valid row.
+- uploading a new CSV before the draw replaces the previous allowlist and clears current participants.
+- after the draw, the allowlist cannot be replaced unless the sweepstake is reset.
 
 ## Operating Notes
 
-- Start server with `node --experimental-sqlite server/index.js` via `npm start`.
-- Default port: `8097`.
-- Default DB path: `data/sweepstake.sqlite`.
-- No paid API or LLM wired yet.
+- Upload the employee email list before asking people to register.
+- Export a backup before a real office draw.
+- Once a draw exists, participant edits are locked.
+- Reset the sweepstake if the participant list needs to change after a draw.
+- 2026 qualifiers are not all final yet, so most team slots are editable placeholders.
+- No paid sports API or LLM is wired yet.
+
+## Repository
+
+Private GitHub repo:
+
+```text
+https://github.com/dr-gideon/world-cup-sweepstake
+```

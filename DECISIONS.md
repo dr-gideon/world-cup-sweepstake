@@ -60,3 +60,10 @@ Rationale: Office users need shared registrations, one canonical draw, and consi
 Decision: Add a dedicated Tele view for office screens after matches, backed by richer match-impact audit events when team statuses change.
 
 Rationale: The sweepstake should feel alive during the tournament, with broadcast-style headlines, prize race, survival board, drama feed, and ticker instead of another admin table.
+
+
+## 2026-06-10 — Gate registration by employee email allowlist
+
+Decision: Admin uploads a CSV employee list with `email,name,department`; registration requires a matching email and each email can join once. Public app state and screens do not display employee email addresses.
+
+Rationale: The office needs fair one-entry-per-employee registration without Microsoft login setup. A CSV allowlist is simple, auditable, and easy for the organiser to prepare.

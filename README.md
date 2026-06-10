@@ -33,7 +33,9 @@ The current app keeps the Resolve colour influence but switches to a modern even
 
 ## Features
 
-- Participant registration with optional department.
+- Employee allowlist CSV upload.
+- Email-gated participant registration with one entry per employee email.
+- Public screens do not display employee email addresses.
 - Shared SQLite database instead of browser-only LocalStorage.
 - Fair draw across all 48 World Cup team slots.
 - Bonus teams distributed evenly when fewer than 48 people join.
@@ -123,8 +125,28 @@ Full-stack smoke check used during development:
 - reveal one pick
 - confirm built frontend is served
 
+## Employee CSV format
+
+Upload this in Admin before registration opens:
+
+```csv
+email,name,department
+alice@company.com,Alice Murphy,Sales
+bob@company.com,Bob Lee,Support
+```
+
+Rules:
+
+- `email` is required.
+- `name` and `department` are optional but recommended.
+- emails are normalized to lowercase.
+- duplicate emails in the CSV are ignored after the first valid row.
+- uploading a new CSV before the draw replaces the previous allowlist and clears current participants.
+- after the draw, the allowlist cannot be replaced unless the sweepstake is reset.
+
 ## Operating Notes
 
+- Upload the employee email list before asking people to register.
 - Export a backup before a real office draw.
 - Once a draw exists, participant edits are locked.
 - Reset the sweepstake if the participant list needs to change after a draw.

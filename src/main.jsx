@@ -68,18 +68,38 @@ function App() {
 }
 
 function EnterScreen({ state, action, goDraw }) {
+  const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [department, setDepartment] = useState("");
+  const [lookup, setLookup] = useState(null);
+  const [checking, setChecking] = useState(false);
   const spotsLeft = Math.max(48 - state.participants.length, 0);
   const locked = Boolean(state.draw);
+  const allowlistReady = state.allowlist?.eligible > 0;
+  const canJoin = allowlistReady && lookup?.allowed && !lookup?.joined && !locked && name.trim();
   const prizes = usePrizes(state);
+
+  async function checkEmail() {
+    if (!email.trim()) return;
+    setChecking(true);
+    try {
+      const result = await api(`/api/allowlist/lookup?email=${encodeURIComponent(email)}`);
+      setLookup(result);
+      if (result.employee?.name) setName(result.employee.name);
+      if (result.employee?.department) setDepartment(result.employee.department);
+    } finally {
+      setChecking(false);
+    }
+  }
 
   async function submit(event) {
     event.preventDefault();
-    if (!name.trim() || locked) return;
-    await action("/api/participants", { method: "POST", body: { name, department } });
+    if (!canJoin) return;
+    await action("/api/participants", { method: "POST", body: { email, name, department } });
+    setEmail("");
     setName("");
     setDepartment("");
+    setLookup(null);
   }
 
   return <section className="hero-grid">
@@ -89,6 +109,8 @@ function EnterScreen({ state, action, goDraw }) {
       <p className="hero-text">A fast, fun sweepstake for the 2026 World Cup. Join the draw, watch the team reveal, then follow who is still alive on the office board.</p>
       <div className="hero-stats" aria-label="Sweepstake stats">
         <Stat value={state.participants.length} label="players joined" />
+        <Stat value={state.allowlist?.eligible || 0} label="eligible emails" />
+        <Stat value={state.allowlist?.remaining || 0} label="not joined yet" />
         <Stat value={spotsLeft} label="team slots left" />
         <Stat value="€50" label="champion prize" />
         <Stat value="€30" label="runner-up prize" />
@@ -103,10 +125,16 @@ function EnterScreen({ state, action, goDraw }) {
       <div className="ticket-stub"><span>ADMIT ONE</span><strong>World Cup Draw Night</strong><em>Free entry</em></div>
       <form onSubmit={submit}>
         <h2>{locked ? "The draw is locked" : "Enter the sweepstake"}</h2>
-        <p>{locked ? "The teams are already assigned. Head to the reveal or team board." : "Add your name before the draw closes. No buy-in, no fuss."}</p>
-        <label>Your name<input value={name} onChange={(event) => setName(event.target.value)} disabled={locked} placeholder="e.g. Alex Murphy" /></label>
-        <label>Department <span>optional</span><input value={department} onChange={(event) => setDepartment(event.target.value)} disabled={locked} placeholder="e.g. Sales" /></label>
-        <button className="submit-btn" disabled={locked || !name.trim() || state.participants.length >= 48}><PartyPopper size={18} /> Put me in the draw</button>
+        <p>{locked ? "The teams are already assigned. Head to the reveal or team board." : "Use your work email. Only emails on the organiser's list can join."}</p>
+        {!allowlistReady && <p className="form-note warning">Registration is waiting for the organiser to upload the employee email list.</p>}
+        <label>Work email<input value={email} onChange={(event) => { setEmail(event.target.value); setLookup(null); }} onBlur={checkEmail} disabled={locked || !allowlistReady} placeholder="name@company.com" /></label>
+        <button type="button" className="quiet-form-btn" disabled={!email.trim() || checking || locked || !allowlistReady} onClick={checkEmail}>{checking ? "Checking…" : "Check email"}</button>
+        {lookup?.allowed && !lookup?.joined && <p className="form-note success">You’re on the list{lookup.employee?.name ? ` — welcome, ${lookup.employee.name}.` : "."}</p>}
+        {lookup?.joined && <p className="form-note warning">Looks like this email is already in the draw.</p>}
+        {lookup && !lookup.allowed && <p className="form-note warning">This email is not on the sweepstake list. Check spelling or ask the organiser.</p>}
+        <label>Your name<input value={name} onChange={(event) => setName(event.target.value)} disabled={locked || !lookup?.allowed || lookup?.joined} placeholder="e.g. Alex Murphy" /></label>
+        <label>Department <span>optional</span><input value={department} onChange={(event) => setDepartment(event.target.value)} disabled={locked || !lookup?.allowed || lookup?.joined} placeholder="e.g. Sales" /></label>
+        <button className="submit-btn" disabled={!canJoin || state.participants.length >= 48}><PartyPopper size={18} /> Put me in the draw</button>
         {state.participants.length >= 48 && !locked && <p className="form-note warning">All 48 slots are full. Shared-team mode would need a new rule.</p>}
       </form>
     </div>
@@ -114,7 +142,7 @@ function EnterScreen({ state, action, goDraw }) {
     <div className="live-strip">
       <PrizeMini title="€50 champion" prize={prizes.winner} />
       <PrizeMini title="€30 runner-up" prize={prizes.runnerUp} />
-      <div className="mini-panel"><strong>{locked ? "Draw locked" : "Registration open"}</strong><span>{locked ? "Participants can no longer be edited." : "Still accepting names."}</span></div>
+      <div className="mini-panel"><strong>{locked ? "Draw locked" : allowlistReady ? "Email-gated entry" : "Awaiting list"}</strong><span>{locked ? "Participants can no longer be edited." : allowlistReady ? "Only uploaded employee emails can join." : "Admin must upload CSV first."}</span></div>
     </div>
   </section>;
 }
@@ -238,6 +266,7 @@ function TeleScreen({ state }) {
 }
 
 function AdminScreen({ state, action, refresh }) {
+  const [csvText, setCsvText] = useState("email,name,department\n");
   async function patchTeam(id, patch) {
     await action(`/api/teams/${id}`, { method: "PATCH", body: patch });
   }
@@ -249,6 +278,18 @@ function AdminScreen({ state, action, refresh }) {
     await action("/api/reset", { method: "POST" });
   }
 
+  async function uploadCsv() {
+    await action("/api/allowlist", { method: "POST", text: csvText, contentType: "text/csv" });
+    await refresh();
+  }
+
+  function loadCsvFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setCsvText(String(reader.result || ""));
+    reader.readAsText(file);
+  }
+
   return <section className="admin-page">
     <div className="section-heading compact">
       <p className="kicker"><RefreshCcw size={16} /> Admin booth</p>
@@ -257,6 +298,15 @@ function AdminScreen({ state, action, refresh }) {
     </div>
 
     <div className="admin-grid">
+      <div className="glass-panel">
+        <h2>Employee email list</h2>
+        <p>Upload CSV with columns: email, name, department. Emails are used only for eligibility and duplicate prevention.</p>
+        <div className="allowlist-stats"><strong>{state.allowlist?.eligible || 0}</strong><span>eligible</span><strong>{state.allowlist?.joined || 0}</strong><span>joined</span><strong>{state.allowlist?.remaining || 0}</strong><span>not joined</span></div>
+        <label className="file-picker">Upload CSV file<input type="file" accept=".csv,text/csv" onChange={(event) => loadCsvFile(event.target.files?.[0])} /></label>
+        <textarea className="csv-box" value={csvText} onChange={(event) => setCsvText(event.target.value)} spellCheck="false" />
+        <button className="submit-btn" disabled={Boolean(state.draw)} onClick={uploadCsv}>Upload employee list</button>
+      </div>
+
       <div className="glass-panel">
         <h2>Participants</h2>
         <p>{state.draw ? "Locked after draw." : "Editable until the draw runs."}</p>
@@ -353,10 +403,11 @@ function labelForView(view) {
 }
 
 async function api(path, options = {}) {
+  const hasText = Object.prototype.hasOwnProperty.call(options, "text");
   const response = await fetch(path, {
     method: options.method || "GET",
-    headers: options.body ? { "Content-Type": "application/json" } : undefined,
-    body: options.body ? JSON.stringify(options.body) : undefined
+    headers: hasText ? { "Content-Type": options.contentType || "text/plain" } : options.body ? { "Content-Type": "application/json" } : undefined,
+    body: hasText ? options.text : options.body ? JSON.stringify(options.body) : undefined
   });
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
