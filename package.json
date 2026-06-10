@@ -1,0 +1,10 @@
+{
+  "name": "world-cup-sweepstake",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Office sweepstake app for the 2026 FIFA World Cup.",
+  "scripts": {
+    "test": "echo \"No tests yet\"",
+    "dev": "echo \"Stack not selected yet\""
+  }
+}
