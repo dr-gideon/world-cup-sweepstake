@@ -116,8 +116,10 @@ function EnterPage({ state, action, setPage }) {
   async function submit(event) {
     event.preventDefault();
     if (!canJoin) return;
-    await action("/api/participants", { method: "POST", body: { email, name, department } }, `${name} is in the draw!`);
+    const participant = await action("/api/participants", { method: "POST", body: { email, name, department } }, `${name} is in the draw!`);
+    localStorage.setItem("wcs_participant", JSON.stringify({ id: participant.id, email, name: participant.name || name }));
     setEmail(""); setName(""); setDepartment(""); setLookup(null);
+    setPage("draw");
   }
 
   return <main className="page">
@@ -162,21 +164,59 @@ function EnterPage({ state, action, setPage }) {
 }
 
 function DrawPage({ state, action, setPage }) {
-  const [seed, setSeed] = useState("office-2026");
   const assignments = state.assignments || [];
-  const revealed = assignments.filter((a) => a.revealed);
-  const canDraw = !state.draw && state.participants.length > 0 && state.participants.length <= 48;
+  const [email, setEmail] = useState("");
+  const [lookup, setLookup] = useState(null);
+  const [revealIndex, setRevealIndex] = useState(0);
+  const remembered = readRememberedParticipant();
+  const personalAssignments = lookup?.assignments?.length ? lookup.assignments : remembered?.id ? assignments.filter((assignment) => assignment.participant.id === remembered.id) : [];
+  const current = personalAssignments[revealIndex] || personalAssignments[0];
+
+  async function findTeams(event) {
+    event.preventDefault();
+    if (!email.trim()) return;
+    const result = await api(`/api/participants/lookup?email=${encodeURIComponent(email)}`);
+    setLookup(result);
+    if (result.participant) localStorage.setItem("wcs_participant", JSON.stringify({ id: result.participant.id, email, name: result.participant.name }));
+    setRevealIndex(0);
+  }
+
+  function nextReveal() {
+    setRevealIndex((index) => Math.min(index + 1, Math.max(personalAssignments.length - 1, 0)));
+  }
+
   return <main className="page">
     <div className="hero-eyebrow">Draw Stage</div>
-    <h1 className="hero-title small">{state.draw ? "Teams revealed." : "Ready to draw?"}</h1>
-    <p className="hero-body">{state.draw ? `${state.participants.length} players have been assigned teams. Reveal them one by one or jump to the board.` : "Once verified players have entered, run the draw to assign all 48 teams."}</p>
-    <div className="btn-row draw-actions">
-      {!state.draw && <p className="public-note">The organiser will run the draw from the admin console once registration is ready.</p>}
-      {state.draw && <p className="public-note">The draw is live. Reveals are controlled by the organiser.</p>}
-    </div>
-    {state.draw ? <div className="draw-grid">{assignments.map((assignment) => <DrawCard key={assignment.id} assignment={assignment} />)}</div> : <Empty icon="🎲" title="Draw hasn't run yet" desc="Enter with your work email, then watch this page when the organiser starts the reveal." />}
+    <h1 className="hero-title small">{state.draw ? "Your team reveal." : "Ready to draw?"}</h1>
+    <p className="hero-body">{state.draw ? "Find your entry and reveal your team draw with the drama it deserves." : "Once verified players have entered, the organiser will run the draw from Admin."}</p>
+
+    {!state.draw && <Empty icon="🎲" title="Draw hasn't run yet" desc="Enter with your work email, then come back when the organiser starts the draw." />}
+
+    {state.draw && <section className="personal-reveal-layout">
+      <div className="reveal-card-stage">
+        {personalAssignments.length ? <>
+          <div className="reveal-count">Team {revealIndex + 1} of {personalAssignments.length}</div>
+          <div className="reveal-card" key={current?.id}>
+            <div className="reveal-card-shine" />
+            <div className="reveal-crest"><TeamMark flag={current.team.flag} name={current.team.name} /></div>
+            <div className="reveal-kicker">{current.participant.name} drew</div>
+            <h2>{current.team.name}</h2>
+            <p>{current.team.code} · Pot {current.team.pot}</p>
+          </div>
+          <div className="btn-row center"><button className="btn btn-primary" disabled={revealIndex >= personalAssignments.length - 1} onClick={nextReveal}>Reveal next team →</button><button className="btn btn-ghost" onClick={() => setRevealIndex(0)}>Start again</button></div>
+        </> : <div className="entry-card find-card"><div className="entry-card-header"><div className="entry-card-eyebrow">Find my draw</div><div className="entry-card-title">Enter your email</div><div className="entry-card-sub">Same work email used to join</div></div><form className="entry-card-body" onSubmit={findTeams}><p>This browser does not know who entered. Type your work email to reveal your teams.</p>{lookup && !lookup.found && <Notice tone="warn">No draw entry found for that email.</Notice>}<Field label="Work email"><input className="form-input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@company.com" /></Field><button className="btn-enter" disabled={!email.trim()}>Find my teams</button></form></div>}
+      </div>
+
+      <aside className="my-teams-panel">
+        <h3>My teams</h3>
+        {personalAssignments.length ? personalAssignments.map((assignment, index) => <button key={assignment.id} className={`my-team-row ${index === revealIndex ? "active" : ""}`} onClick={() => setRevealIndex(index)}><TeamMark flag={assignment.team.flag} name={assignment.team.name} /><span>{assignment.team.name}</span><em>Pot {assignment.team.pot}</em></button>) : <p>Find your entry to show your assigned teams.</p>}
+      </aside>
+    </section>}
+
+    {state.draw && <section className="full-board"><div className="section-label">Full draw board</div><div className="draw-grid compact">{assignments.map((assignment) => <DrawCard key={assignment.id} assignment={assignment} />)}</div></section>}
   </main>;
 }
+
 
 function TeamsPage({ state }) {
   const [search, setSearch] = useState("");
@@ -421,6 +461,9 @@ function Notice({ tone, children }) { return <p className={`notice ${tone}`}>{ch
 function Empty({ icon, title, desc }) { return <div className="empty-state"><div className="empty-state-icon">{icon}</div><div className="empty-state-title">{title}</div><div className="empty-state-desc">{desc}</div></div>; }
 function Splash({ text }) { return <div className="app splash"><div className="empty-state"><div className="empty-state-icon">🏆</div><div className="empty-state-title">{text}</div></div></div>; }
 
+function readRememberedParticipant() {
+  try { return JSON.parse(localStorage.getItem("wcs_participant") || "null"); } catch { return null; }
+}
 function usePrizes(state) { return useMemo(() => ({ winner: state.assignments?.find((a) => a.team.status === "winner") || null, runnerUp: state.assignments?.find((a) => a.team.status === "runner-up") || null }), [state.assignments]); }
 function tickerItems(state) { return ["FREE ENTRY", "€80 PRIZE POT", `${state.participants.length} PLAYERS`, `${state.allowlist?.remaining || 0} NOT JOINED`, "OFFICE GLORY AWAITS"]; }
 function validateEmployeeCsv(text) {

@@ -528,6 +528,15 @@ export function importAllowlist(csvText) {
   return getAllowlistStats();
 }
 
+export function lookupParticipantTeams(email) {
+  const cleanEmail = normaliseEmail(email);
+  if (!cleanEmail) throw httpError(400, "Email is required.");
+  const participant = db.prepare("SELECT id, name, department FROM participants WHERE email = ?").get(cleanEmail);
+  if (!participant) return { found: false, participant: null, assignments: [] };
+  const state = getState();
+  return { found: true, participant, assignments: state.assignments.filter((assignment) => assignment.participant.id === participant.id) };
+}
+
 export function lookupEmployee(email) {
   const cleanEmail = normaliseEmail(email);
   if (!cleanEmail) throw httpError(400, "Email is required.");

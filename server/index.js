@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fetchFootballDataMatches } from "./football-data.js";
 import { buildMatchDramaSummary, buildTeleSummary } from "./tele-summary.js";
-import { addParticipant, createDraw, createTeleSummary, exportBackupJson, exportNotJoinedCsv, exportParticipantsCsv, getState, hasTeleSummary, importAllowlist, importFootballDataTeams, initDb, lookupEmployee, recordProviderSync, removeMatch, removeParticipant, resetSweepstake, revealAll, revealNext, syncFootballDataMatches, updateTeam, upsertMatch } from "./db.js";
+import { addParticipant, createDraw, createTeleSummary, exportBackupJson, exportNotJoinedCsv, exportParticipantsCsv, getState, hasTeleSummary, importAllowlist, importFootballDataTeams, initDb, lookupEmployee, lookupParticipantTeams, recordProviderSync, removeMatch, removeParticipant, resetSweepstake, revealAll, revealNext, syncFootballDataMatches, updateTeam, upsertMatch } from "./db.js";
 
 const app = express();
 const port = Number(process.env.PORT || 8097);
@@ -43,6 +43,7 @@ app.post("/api/auth/logout", (req, res) => {
 });
 
 app.get("/api/allowlist/lookup", wrap((req, res) => res.json(lookupEmployee(req.query.email))));
+app.get("/api/participants/lookup", wrap((req, res) => res.json(lookupParticipantTeams(req.query.email))));
 app.post("/api/participants", wrap((req, res) => res.status(201).json(addParticipant(req.body))));
 
 app.post("/api/allowlist", requireAdmin, express.text({ type: ["text/*", "application/csv", "application/vnd.ms-excel"], limit: "2mb" }), wrap((req, res) => res.status(201).json(importAllowlist(req.body))));
