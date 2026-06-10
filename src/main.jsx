@@ -256,7 +256,6 @@ function DrawPage({ state, action, setPage }) {
               <div className="mystery-ball">?</div>
               <div className="reveal-kicker">Your team is locked in</div>
               <h2>Ready?</h2>
-              <p>Tap reveal to start the draw animation</p>
             </>}
           </div>
           <div className="btn-row center">{!isCurrentRevealed ? <button className="btn btn-primary" disabled={spinning} onClick={startReveal}>{spinning ? "Revealing…" : "Reveal my team"}</button> : <><button className="btn btn-primary" disabled={revealIndex >= personalAssignments.length - 1} onClick={nextReveal}>Next team →</button><button className="btn btn-ghost" onClick={() => { setRevealedTeams({}); setRevealIndex(0); }}>Start again</button></>}</div>
