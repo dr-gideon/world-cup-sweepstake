@@ -115,6 +115,12 @@ function EnterPage({ state, action, setPage, setRegisteredNotice }) {
     }
   }
 
+  async function showExistingRegistration() {
+    const result = await api(`/api/participants/lookup?email=${encodeURIComponent(email)}`);
+    if (result.participant) localStorage.setItem("wcs_participant", JSON.stringify({ id: result.participant.id, email, name: result.participant.name }));
+    setRegisteredNotice({ name: result.participant?.name || lookup.employee?.name || name || "You", email, alreadyJoined: true });
+  }
+
   async function submit(event) {
     event.preventDefault();
     if (!canJoin) return;
@@ -149,6 +155,7 @@ function EnterPage({ state, action, setPage, setRegisteredNotice }) {
           <button type="button" className="btn-check" disabled={!email.trim() || checking || locked || !allowlistReady} onClick={checkEmail}>{checking ? "Checking…" : "Check email"}</button>
           {lookup?.allowed && !lookup?.joined && <Notice tone="ok">You’re on the list{lookup.employee?.name ? ` — welcome, ${lookup.employee.name}.` : "."}</Notice>}
           {lookup?.joined && <Notice tone="warn">Looks like this email is already in the draw.</Notice>}
+          {lookup?.joined && <button type="button" className="btn-check" onClick={showExistingRegistration}>Show my registration</button>}
           {lookup && !lookup.allowed && <Notice tone="warn">This email is not on the sweepstake list.</Notice>}
           <Field label="Your name"><input className="form-input" value={name} disabled={locked || !lookup?.allowed || lookup?.joined} placeholder="e.g. Alex Murphy" onChange={(e) => setName(e.target.value)} /></Field>
           <Field label="Department" optional><input className="form-input" value={department} disabled={locked || !lookup?.allowed || lookup?.joined} placeholder="e.g. Sales" onChange={(e) => setDepartment(e.target.value)} /></Field>
@@ -170,9 +177,9 @@ function RegistrationModal({ notice, onClose, onDraw }) {
     <div className="registered-modal">
       <button className="modal-close" onClick={onClose} aria-label="Close">×</button>
       <div className="registered-badge">✓</div>
-      <div className="registered-eyebrow">You’re registered</div>
+      <div className="registered-eyebrow">{notice.alreadyJoined ? "Already registered" : "You’re registered"}</div>
       <h2>{notice.name} is in the draw</h2>
-      <p>{notice.email} has been verified. Keep this browser open and the Draw page will know which teams are yours.</p>
+      <p>{notice.email} has been verified. {notice.alreadyJoined ? "You can head straight to the Draw page." : "Keep this browser open and the Draw page will know which teams are yours."}</p>
       <div className="btn-row center"><button className="btn btn-primary" onClick={onDraw}>Go to Draw stage →</button><button className="btn btn-ghost" onClick={onClose}>Stay here</button></div>
     </div>
   </div>;
