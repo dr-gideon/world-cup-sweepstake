@@ -71,7 +71,7 @@ function App() {
   if (!state) return <Splash text={error || "Loading the draw room…"} />;
 
   return <div className="app">
-    <div className="ticker"><div className="ticker-inner">{repeatTickerItems(state).map((item, i) => <span key={i}>{item}<b> · </b></span>)}</div></div>
+    <div className="ticker"><div className="ticker-track"><TickerGroup state={state} /><TickerGroup state={state} ariaHidden /></div></div>
     {!isTeleRoute && <nav>
       <button className="nav-logo" onClick={() => isAdminRoute ? null : setPage("enter")} aria-label="Home">
         <span className="world-cup-mark" aria-hidden="true">🏆</span>
@@ -374,6 +374,7 @@ function Empty({ icon, title, desc }) { return <div className="empty-state"><div
 function Splash({ text }) { return <div className="app splash"><div className="empty-state"><div className="empty-state-icon">🏆</div><div className="empty-state-title">{text}</div></div></div>; }
 
 function usePrizes(state) { return useMemo(() => ({ winner: state.assignments?.find((a) => a.team.status === "winner") || null, runnerUp: state.assignments?.find((a) => a.team.status === "runner-up") || null }), [state.assignments]); }
+function TickerGroup({ state, ariaHidden = false }) { return <div className="ticker-group" aria-hidden={ariaHidden}>{tickerItems(state).map((item, i) => <span key={i}>{item}<b> · </b></span>)}</div>; }
 function tickerItems(state) { return ["FREE ENTRY", "€80 PRIZE POT", `${state.participants.length} PLAYERS`, `${state.allowlist?.remaining || 0} NOT JOINED`, "OFFICE GLORY AWAITS"]; }
 function validateEmployeeCsv(text) {
   const rows = parseCsv(text);
@@ -409,7 +410,6 @@ function parseCsv(text) {
   row.push(cell); if (row.some((v) => v.trim())) rows.push(row);
   return rows;
 }
-function repeatTickerItems(state) { return Array.from({ length: 8 }, () => tickerItems(state)).flat(); }
 function label(view) { return { enter: "Enter", draw: "Draw", teams: "Teams", tele: "Tele", admin: "Admin" }[view]; }
 function stageLabel(value) { return STAGES.find((stage) => stage.value === value)?.label || value; }
 function potColor(pot) { return ({ 1: { bg: "#FFD700", text: "#1a1200" }, 2: { bg: "#C0C0C0", text: "#111" }, 3: { bg: "#CD7F32", text: "#1a0800" }, 4: { bg: "#2a3050", text: "#9ba3c9" } })[pot] || { bg: "#2a3050", text: "#fff" }; }
