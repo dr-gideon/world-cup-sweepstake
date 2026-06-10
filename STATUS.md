@@ -4,7 +4,7 @@ A fun office sweepstake app for the 2026 FIFA World Cup.
 
 ## Concept
 
-Free-entry, CEO-sponsored sweepstake with an exciting entry flow, live draw reveal, shared team board, and prize tracking.
+Free-entry office sweepstake with an exciting entry flow, live draw reveal, shared team board, and prize tracking.
 
 Prize rules:
 

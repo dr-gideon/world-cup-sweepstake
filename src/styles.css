@@ -15,7 +15,8 @@ button:disabled { opacity:.45; cursor:not-allowed; }
 
 nav { position:sticky; top:0; z-index:100; background:rgba(8,12,24,.92); backdrop-filter:blur(12px); border-bottom:1px solid rgba(255,215,0,.12); padding:0 2rem; display:flex; align-items:center; min-height:64px; gap:2rem; }
 .nav-logo { display:flex; align-items:center; gap:10px; background:none; border:0; color:#fff; text-align:left; }
-.nav-logo img { width:38px; height:38px; object-fit:contain; border-radius:10px; background:linear-gradient(135deg,var(--gold),var(--orange)); }
+.nav-logo img,.world-cup-mark { width:38px; height:38px; object-fit:contain; border-radius:10px; background:linear-gradient(135deg,var(--gold),var(--orange)); }
+.world-cup-mark { display:grid; place-items:center; color:#1a1200; font-size:22px; box-shadow:0 0 0 1px rgba(255,215,0,.22), 0 10px 28px rgba(255,215,0,.14); }
 .nav-title { font-family: Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif; font-size:22px; letter-spacing:1px; color:#fff; line-height:1; }
 .nav-sub { font-size:11px; color:#666; letter-spacing:1px; text-transform:uppercase; margin-top:2px; }
 .nav-links { display:flex; gap:4px; margin-left:auto; }

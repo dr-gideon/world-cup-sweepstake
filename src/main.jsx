@@ -60,7 +60,7 @@ function App() {
     <div className="ticker"><div className="ticker-inner">{tickerItems(state).concat(tickerItems(state)).map((item, i) => <span key={i}>{item}<b> · </b></span>)}</div></div>
     <nav>
       <button className="nav-logo" onClick={() => setPage("enter")} aria-label="Home">
-        <img src="/assets/enterpryze-intelligence-icon.png" alt="" />
+        <span className="world-cup-mark" aria-hidden="true">🏆</span>
         <div><div className="nav-title">World Cup 2026</div><div className="nav-sub">Office Sweepstake</div></div>
       </button>
       <div className="nav-links">{NAV.map((item) => <button key={item} className={`nav-link ${page === item ? "active" : ""}`} onClick={() => setPage(item)}>{label(item)}</button>)}</div>
@@ -109,7 +109,7 @@ function EnterPage({ state, action, setPage }) {
   return <main className="page">
     <div className="hero-layout">
       <section>
-        <div className="hero-eyebrow">Free Entry · CEO Sponsored · €80 Prize Pot</div>
+        <div className="hero-eyebrow">Free Entry · €80 Prize Pot</div>
         <h1 className="hero-title">Draw your<br />team.<br />Win <span>office</span><br />glory.</h1>
         <p className="hero-body">A fast, fun sweepstake for the 2026 World Cup. Verify your work email, enter the draw, watch the reveal, then follow who survives on the office board.</p>
         <div className="stats-row">
@@ -238,7 +238,7 @@ function Empty({ icon, title, desc }) { return <div className="empty-state"><div
 function Splash({ text }) { return <div className="app splash"><div className="empty-state"><div className="empty-state-icon">🏆</div><div className="empty-state-title">{text}</div></div></div>; }
 
 function usePrizes(state) { return useMemo(() => ({ winner: state.assignments?.find((a) => a.team.status === "winner") || null, runnerUp: state.assignments?.find((a) => a.team.status === "runner-up") || null }), [state.assignments]); }
-function tickerItems(state) { return ["FREE ENTRY", "CEO SPONSORED", "€80 PRIZE POT", `${state.participants.length} PLAYERS`, `${state.allowlist?.remaining || 0} NOT JOINED`, "OFFICE GLORY AWAITS"]; }
+function tickerItems(state) { return ["FREE ENTRY", "€80 PRIZE POT", `${state.participants.length} PLAYERS`, `${state.allowlist?.remaining || 0} NOT JOINED`, "OFFICE GLORY AWAITS"]; }
 function label(view) { return { enter: "Enter", draw: "Draw", teams: "Teams", tele: "Tele", admin: "Admin" }[view]; }
 function stageLabel(value) { return STAGES.find((stage) => stage.value === value)?.label || value; }
 function potColor(pot) { return ({ 1: { bg: "#FFD700", text: "#1a1200" }, 2: { bg: "#C0C0C0", text: "#111" }, 3: { bg: "#CD7F32", text: "#1a0800" }, 4: { bg: "#2a3050", text: "#9ba3c9" } })[pot] || { bg: "#2a3050", text: "#fff" }; }
