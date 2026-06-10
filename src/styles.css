@@ -209,7 +209,7 @@ a.btn { text-decoration:none; display:inline-flex; align-items:center; justify-c
 .fixture-section { display:grid; gap:8px; }
 .fixture-section h3 { color:var(--gold); font-size:12px; letter-spacing:2px; text-transform:uppercase; }
 .fixture-section > p { color:#666; font-size:12px; font-weight:800; padding:10px; border:1px dashed rgba(255,255,255,.1); border-radius:10px; }
-.fixture-row { display:grid; grid-template-columns:82px 1fr 70px 1fr 86px; gap:10px; align-items:center; padding:10px 12px; border-radius:12px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.07); }
+.fixture-row { display:grid; grid-template-columns:78px minmax(0,1fr) 82px minmax(0,1fr); gap:14px; align-items:center; padding:13px 16px; border-radius:14px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.07); }
 .fixture-row.live { border-color:rgba(34,197,94,.35); background:rgba(34,197,94,.08); }
 .fixture-row.finished { border-color:rgba(255,215,0,.22); }
 .fixture-time { display:grid; gap:2px; color:#888; }
@@ -219,10 +219,9 @@ a.btn { text-decoration:none; display:inline-flex; align-items:center; justify-c
 .fixture-team.away { justify-content:flex-end; }
 .fixture-team .team-crest { width:24px; height:24px; }
 .fixture-score { color:var(--gold); text-align:center; font-family:Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif; font-size:22px; letter-spacing:1px; }
-.fixture-row em { color:#777; font-size:10px; font-weight:900; text-transform:uppercase; letter-spacing:1px; font-style:normal; text-align:right; }
 .match-row small { display:block; color:#777; font-size:11px; margin-top:2px; }
 .match-row .team-crest { width:22px; height:22px; margin-right:6px; }
-@media (max-width:760px) { .fixture-row { grid-template-columns:1fr; } .fixture-team.away { justify-content:flex-start; } .fixture-row em,.fixture-score { text-align:left; } }
+@media (max-width:760px) { .fixture-row { grid-template-columns:1fr; } .fixture-team.away { justify-content:flex-start; } .fixture-score { text-align:left; } }
 
 .impact-row em { color:#777; font-size:11px; font-style:normal; text-transform:uppercase; letter-spacing:1px; }
 .personal-reveal-layout { display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:24px; align-items:start; margin-top:2rem; }
@@ -282,7 +281,8 @@ a.btn { text-decoration:none; display:inline-flex; align-items:center; justify-c
 .roast-row b { display:block; color:#fff; font-size:clamp(1.25rem,2.4vw,2.2rem); line-height:1.05; margin-bottom:10px; }
 .roast-row span { display:block; color:#c8cbd5; font-size:clamp(1rem,1.3vw,1.25rem); line-height:1.35; }
 .tv-lite .fixture-section h3 { font-size:13px; letter-spacing:2px; color:var(--gold); }
-.tv-lite .fixture-row { padding:14px 0; grid-template-columns:88px minmax(120px,1fr) 86px minmax(120px,1fr) 80px; }
+.tv-lite .fixture-row { padding:16px 18px; grid-template-columns:82px minmax(130px,1fr) 92px minmax(130px,1fr); gap:18px; }
 .tv-lite .fixture-score { font-size:1.35rem; }
-.tv-lite .fixture-team strong { font-size:1.05rem; }
+.tv-lite .fixture-team strong { font-size:1.08rem; }
+.tv-lite .fixture-time { border-right:1px solid rgba(255,255,255,.08); padding-right:12px; }
 @media (max-width:1000px) { .tv-board { grid-template-columns:1fr; } .fixtures-card, .drama-card { min-height:auto; } }

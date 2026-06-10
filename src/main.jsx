@@ -436,7 +436,6 @@ function FixtureRow({ match }) {
     <div className="fixture-team"><TeamMark flag={match.homeFlag} name={match.homeName} /><strong>{match.homeCode}</strong></div>
     <strong className="fixture-score">{scoreText(match)}</strong>
     <div className="fixture-team away"><strong>{match.awayCode}</strong><TeamMark flag={match.awayFlag} name={match.awayName} /></div>
-    <em>{match.status}</em>
   </div>;
 }
 
