@@ -315,3 +315,10 @@ A clean clone production-style dry-run passed on temp port `8108` with temp DB:
 - Admin fixture rows now include an `Edit` action.
 - Editing loads the imported/manual match into the form and `Update match` patches the existing fixture instead of creating a duplicate.
 - This allows manual score correction when Football-Data marks a match finished but returns null scores.
+
+## 2026-06-11 — Inline match result editing
+
+- Reworked Admin match editing after preview feedback.
+- Match list now sorts by kickoff ascending so the earliest fixture appears first.
+- Imported/manual fixture rows now expand inline for result editing instead of loading into the top add-match form.
+- Inline editor PATCHes the existing fixture with team IDs, score, status, and notes.

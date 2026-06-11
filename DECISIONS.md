@@ -184,3 +184,9 @@ Rationale: Football-Data can mark a match `FINISHED` while returning `null` scor
 Decision: Imported match rows must be editable from Admin, not only deletable.
 
 Rationale: Provider data can be incomplete or delayed. Organisers need a direct way to correct scores on the existing fixture so Tele and drama generation use the right result without creating duplicate matches.
+
+## 2026-06-11 — Inline editing for fixture results
+
+Decision: Existing fixture result edits should happen inline under the selected match row.
+
+Rationale: Loading imported fixtures into the top add-match form was confusing and looked broken. Inline editing keeps the correction anchored to the match being updated and avoids accidental duplicate fixtures.
