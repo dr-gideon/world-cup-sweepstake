@@ -296,3 +296,9 @@ A clean clone production-style dry-run passed on temp port `8108` with temp DB:
 - `Replace full list` remains available before the draw but now shows a confirmation because it clears current participants.
 - Append smoke test confirmed adding a second CSV preserves existing participants.
 - Admin employee CSV panel polished: safer copy, clearer Add-vs-Replace hierarchy, full-width primary action, and subdued destructive replace action.
+
+## 2026-06-11 — Latest drama and startup sync
+
+- Tele drama panel now shows `Latest drama` instead of yesterday-only summaries.
+- It prefers summaries tied to the latest finished match, then recent finished-match summaries, then any generated Tele summaries as fallback.
+- Football-Data auto-sync now runs once immediately on server startup, then continues on the configured interval.

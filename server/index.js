@@ -114,10 +114,15 @@ function startFootballDataScheduler() {
   }
   const intervalMinutes = Math.max(5, Number(process.env.FOOTBALL_DATA_SYNC_INTERVAL_MINUTES || 15));
   scheduler.lastMessage = `Football-Data auto-sync enabled every ${intervalMinutes} minutes.`;
-  scheduler.timer = setInterval(() => runFootballDataSync({ manual: false }).catch((error) => {
+  runScheduledFootballDataSync();
+  scheduler.timer = setInterval(runScheduledFootballDataSync, intervalMinutes * 60 * 1000);
+}
+
+function runScheduledFootballDataSync() {
+  runFootballDataSync({ manual: false }).catch((error) => {
     scheduler.lastMessage = error.message;
     console.warn("Football-Data auto-sync failed:", error.message);
-  }), intervalMinutes * 60 * 1000);
+  });
 }
 
 async function runFootballDataSync({ dateFrom = "", dateTo = "", manual = false } = {}) {

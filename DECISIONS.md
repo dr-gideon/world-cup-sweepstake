@@ -166,3 +166,9 @@ Rationale: The office TV should stay fresh and focused on recent match chatter i
 Decision: Employee CSV management now has two explicit paths: append missed employees without touching participants, and replace the full employee list with confirmation.
 
 Rationale: The original upload replaced the allowlist and cleared participants before the draw, which surprised real office use when a partial CSV was uploaded after people had already joined.
+
+## 2026-06-11 — Latest match drama over calendar-yesterday drama
+
+Decision: Tele should show latest available match drama, not only yesterday's match drama.
+
+Rationale: During live tournament use, newly finished matches should appear on office TV immediately after sync, regardless of calendar day. Auto-sync should also run once at startup so restarted containers do not wait for the first interval before scores update.

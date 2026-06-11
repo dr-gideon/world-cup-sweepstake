@@ -281,37 +281,37 @@ function TeamsPage({ state }) {
 }
 
 function TelePage({ state }) {
-  const yesterdayMatchIds = new Set((state.matches || []).filter((match) => match.status === "finished" && isYesterdayMatch(match)).map((match) => match.id));
-  const summaries = (state.teleSummaries || []).filter((summary) => {
-    const matchId = String(summary.sourceKey || "").match(/^match:([^:]+):/)?.[1];
-    return matchId && yesterdayMatchIds.has(matchId);
-  });
+  const summaries = latestDramaSummaries(state);
   return <main className="page tele-page">
     <div className="tele-frame tv-lite">
       <div className="tele-top"><span>OFFICE WORLD CUP SWEEPSTAKE</span><b>FIXTURES + DRAMA</b><span>{new Date().toLocaleTimeString("en-IE", { hour: "2-digit", minute: "2-digit" })}</span></div>
       <section className="tv-board">
         <div className="tele-card fixtures-card"><div className="section-label">Fixtures & results</div><TeleMatches matches={state.matches || []} /></div>
-        <div className="tele-card drama-card"><div className="section-label">Yesterday's drama</div>{summaries.length ? summaries.slice(0, 5).map((summary) => <div className="impact-row roast-row" key={summary.id}><b>{summary.headline}</b><span>{summary.body}</span></div>) : <Empty icon="📺" title="No drama from yesterday" desc="Finished matches from yesterday will show here once summaries are generated." />}</div>
+        <div className="tele-card drama-card"><div className="section-label">Latest drama</div>{summaries.length ? summaries.slice(0, 5).map((summary) => <div className="impact-row roast-row" key={summary.id}><b>{summary.headline}</b><span>{summary.body}</span></div>) : <Empty icon="📺" title="No drama yet" desc="Finished-match summaries will appear here after sync or manual generation." />}</div>
       </section>
     </div>
   </main>;
 }
 
-function isYesterdayMatch(match) {
+function latestDramaSummaries(state) {
+  const summaries = state.teleSummaries || [];
+  const finished = [...(state.matches || [])].filter((match) => match.status === "finished").sort((a, b) => matchTime(b) - matchTime(a));
+  const matchSummaries = summaries.map((summary) => ({ ...summary, matchId: String(summary.sourceKey || "").match(/^match:([^:]+):/)?.[1] })).filter((summary) => summary.matchId);
+  if (finished.length) {
+    const latestMatchId = finished[0].id;
+    const latest = matchSummaries.filter((summary) => summary.matchId === latestMatchId);
+    if (latest.length) return latest;
+    const finishedIds = new Set(finished.map((match) => match.id));
+    const recentFinished = matchSummaries.filter((summary) => finishedIds.has(summary.matchId));
+    if (recentFinished.length) return recentFinished;
+  }
+  return summaries;
+}
+
+function matchTime(match) {
   const source = match.kickoff || match.updatedAt;
-  if (!source) return false;
-  return dublinDateKey(source) === dublinOffsetDateKey(-1);
-}
-
-function dublinOffsetDateKey(offsetDays = 0) {
-  const date = new Date();
-  date.setDate(date.getDate() + offsetDays);
-  return dublinDateKey(date);
-}
-
-function dublinDateKey(value) {
-  const date = value instanceof Date ? value : new Date(String(value).length === 16 ? `${value}:00Z` : value);
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Dublin", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+  if (!source) return 0;
+  return new Date(String(source).length === 16 ? `${source}:00Z` : source).getTime() || 0;
 }
 
 
