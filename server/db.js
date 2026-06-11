@@ -491,6 +491,50 @@ function updateTeamStatusIfChanged(teamId, status) {
 
 export function importAllowlist(csvText) {
   if (currentDraw()) throw httpError(409, "The draw is locked. Reset before replacing the employee list.");
+  const employees = parseEmployeeCsv(csvText);
+
+  db.exec("BEGIN");
+  try {
+    db.exec("DELETE FROM participants; DELETE FROM allowed_employees;");
+    const insert = db.prepare("INSERT INTO allowed_employees (email, name, department, uploaded_at) VALUES (?, ?, ?, ?)");
+    const uploadedAt = new Date().toISOString();
+    for (const employee of employees) insert.run(employee.email, employee.name, employee.department, uploadedAt);
+    audit("Employee list uploaded", `${employees.length} eligible employees`);
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+  return getAllowlistStats();
+}
+
+export function appendAllowlist(csvText) {
+  if (currentDraw()) throw httpError(409, "The draw is locked. Reset before adding employees.");
+  const employees = parseEmployeeCsv(csvText);
+  const insert = db.prepare(`
+    INSERT INTO allowed_employees (email, name, department, uploaded_at)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(email) DO UPDATE SET
+      name = CASE WHEN excluded.name != '' THEN excluded.name ELSE allowed_employees.name END,
+      department = CASE WHEN excluded.department != '' THEN excluded.department ELSE allowed_employees.department END,
+      uploaded_at = excluded.uploaded_at
+  `);
+  const before = db.prepare("SELECT COUNT(*) AS count FROM allowed_employees").get().count;
+  db.exec("BEGIN");
+  try {
+    const uploadedAt = new Date().toISOString();
+    for (const employee of employees) insert.run(employee.email, employee.name, employee.department, uploadedAt);
+    const after = db.prepare("SELECT COUNT(*) AS count FROM allowed_employees").get().count;
+    audit("Employee list appended", `${after - before} new eligible employees, ${employees.length} rows processed`);
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+  return getAllowlistStats();
+}
+
+function parseEmployeeCsv(csvText) {
   const rows = parseCsv(csvText);
   if (!rows.length) throw httpError(400, "CSV is empty.");
   const headers = rows[0].map((header) => header.trim().toLowerCase());
@@ -512,20 +556,7 @@ export function importAllowlist(csvText) {
     });
   }
   if (!employees.length) throw httpError(400, "No valid email addresses found.");
-
-  db.exec("BEGIN");
-  try {
-    db.exec("DELETE FROM participants; DELETE FROM allowed_employees;");
-    const insert = db.prepare("INSERT INTO allowed_employees (email, name, department, uploaded_at) VALUES (?, ?, ?, ?)");
-    const uploadedAt = new Date().toISOString();
-    for (const employee of employees) insert.run(employee.email, employee.name, employee.department, uploadedAt);
-    audit("Employee list uploaded", `${employees.length} eligible employees`);
-    db.exec("COMMIT");
-  } catch (error) {
-    db.exec("ROLLBACK");
-    throw error;
-  }
-  return getAllowlistStats();
+  return employees;
 }
 
 export function lookupParticipantTeams(email) {

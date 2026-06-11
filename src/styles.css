@@ -170,14 +170,24 @@ nav { position:sticky; top:0; z-index:100; background:rgba(8,12,24,.92); backdro
 .admin-logout { position:fixed; right:18px; bottom:18px; z-index:999; border:1px solid rgba(255,255,255,.16); background:rgba(8,12,24,.88); color:#fff; border-radius:999px; padding:10px 14px; font-weight:900; box-shadow:0 12px 32px rgba(0,0,0,.28); }
 .admin-logout:hover { border-color:rgba(255,215,0,.42); color:var(--gold); }
 @media (max-width:640px) { .admin-draw-controls .seed-input { width:100%; max-width:none; } .admin-logout { position:static; margin:0 1rem 1rem auto; display:block; } }
-.csv-actions { gap:10px; margin:12px 0; }
-.csv-actions .file-upload { flex:1; margin:0; min-width:160px; }
-.csv-preview { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:0 0 12px; }
-.csv-preview div { border:1px solid rgba(255,255,255,.08); border-radius:10px; background:rgba(255,255,255,.035); padding:10px; text-align:center; }
+.employee-panel .admin-panel-sub { max-width:300px; }
+.employee-panel .csv-box { min-height:126px; margin-bottom:10px; }
+.csv-actions { gap:10px; margin:14px 0 12px; }
+.csv-actions .btn,.csv-actions .file-upload { flex:1 1 0; margin:0; min-width:0; }
+.csv-actions .file-upload { color:#fff; }
+.csv-preview { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:0 0 14px; }
+.csv-preview div { border:1px solid rgba(255,255,255,.08); border-radius:12px; background:rgba(255,255,255,.035); padding:12px 8px; text-align:center; }
 .csv-preview b { display:block; color:#fff; font-size:22px; line-height:1; }
-.csv-preview span { color:#666; font-size:10px; font-weight:900; text-transform:uppercase; letter-spacing:1px; }
-.csv-preview p { grid-column:1 / -1; color:#fde68a; background:rgba(255,215,0,.08); border:1px solid rgba(255,215,0,.18); border-radius:10px; padding:10px; font-size:12px; line-height:1.4; }
-@media (max-width:640px) { .csv-preview { grid-template-columns:1fr; } }
+.csv-preview span { color:#777; font-size:10px; font-weight:900; text-transform:uppercase; letter-spacing:1px; }
+.csv-preview p { grid-column:1 / -1; color:#fde68a; background:rgba(255,215,0,.08); border:1px solid rgba(255,215,0,.18); border-radius:12px; padding:10px; font-size:12px; line-height:1.4; }
+.employee-action-stack { display:grid; gap:10px; }
+.employee-primary-action { width:100%; justify-content:space-between; min-height:54px; padding:12px 16px; text-align:left; }
+.employee-primary-action span { display:block; margin-left:12px; color:rgba(26,18,0,.62); font-size:10px; font-weight:900; letter-spacing:.7px; text-transform:uppercase; }
+.employee-danger-action { width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:48px; padding:11px 14px; border:1px solid rgba(239,68,68,.24); border-radius:12px; background:rgba(239,68,68,.06); color:#fecaca; font-weight:900; cursor:pointer; }
+.employee-danger-action span { color:rgba(254,202,202,.58); font-size:10px; text-transform:uppercase; letter-spacing:.7px; }
+.employee-danger-action:hover:not(:disabled) { border-color:rgba(239,68,68,.45); background:rgba(239,68,68,.1); }
+.employee-danger-action:disabled,.employee-primary-action:disabled { opacity:.42; cursor:not-allowed; filter:saturate(.65); }
+@media (max-width:640px) { .csv-preview { grid-template-columns:1fr; } .employee-primary-action,.employee-danger-action { align-items:flex-start; flex-direction:column; } .employee-primary-action span { margin-left:0; } }
 .match-form { display:grid; grid-template-columns:120px 190px 1fr 1fr 80px 80px 130px 1fr auto; gap:8px; align-items:center; }
 .match-list { margin-top:16px; display:grid; gap:8px; }
 .match-row { display:grid; grid-template-columns:90px 1fr 80px 1fr 90px 32px; gap:10px; align-items:center; padding:10px 12px; border-radius:10px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06); }

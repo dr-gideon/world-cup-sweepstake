@@ -160,3 +160,9 @@ Rationale: The office app can still generate useful/funny Tele copy without send
 Decision: The `/tele` drama feed should display only summaries for finished matches from yesterday, not all cached feed items or historical match-impact events.
 
 Rationale: The office TV should stay fresh and focused on recent match chatter instead of replaying stale tournament history.
+
+## 2026-06-11 — Separate add employees from replace employee list
+
+Decision: Employee CSV management now has two explicit paths: append missed employees without touching participants, and replace the full employee list with confirmation.
+
+Rationale: The original upload replaced the allowlist and cleared participants before the draw, which surprised real office use when a partial CSV was uploaded after people had already joined.

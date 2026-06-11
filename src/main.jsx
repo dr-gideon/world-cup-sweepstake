@@ -364,10 +364,17 @@ function AdminPage({ state, action, refresh }) {
   const [csvText, setCsvText] = useState("email,name,department\n");
   const [adminSearch, setAdminSearch] = useState("");
   const csvPreview = useMemo(() => validateEmployeeCsv(csvText), [csvText]);
+  const addEmployeeLabel = csvPreview.valid.length ? `Add ${csvPreview.valid.length} employee${csvPreview.valid.length === 1 ? "" : "s"}` : "Add employees";
   const filteredTeams = state.teams.filter((team) => `${team.name} ${team.code}`.toLowerCase().includes(adminSearch.toLowerCase()));
-  async function uploadCsv() {
+  async function addEmployees() {
     if (!csvPreview.valid.length) throw new Error("CSV has no valid employee emails.");
-    await action("/api/allowlist", { method: "POST", text: csvText, contentType: "text/csv" }, "Employee list uploaded");
+    await action("/api/allowlist/append", { method: "POST", text: csvText, contentType: "text/csv" }, "Employees added");
+    await refresh();
+  }
+  async function replaceEmployeeList() {
+    if (!csvPreview.valid.length) throw new Error("CSV has no valid employee emails.");
+    if (!confirm("Replace the full employee list? This clears current participants before the draw.")) return;
+    await action("/api/allowlist", { method: "POST", text: csvText, contentType: "text/csv" }, "Employee list replaced");
     await refresh();
   }
   function downloadTemplate() {
@@ -388,7 +395,7 @@ function AdminPage({ state, action, refresh }) {
     <section className="admin-panel export-panel"><div className="admin-panel-title">Backups and exports</div><p className="admin-panel-sub">Download backups before the real draw and export not-joined lists for reminders.</p><div className="btn-row"><a className="btn btn-primary" href="/api/export/backup.json">Download full backup</a><a className="btn btn-ghost" href="/api/export/not-joined.csv">Not joined CSV</a><a className="btn btn-ghost" href="/api/export/participants.csv">Participants CSV</a></div></section>
     <ProviderPanel state={state} action={action} />
     <div className="admin-grid">
-      <section className="admin-panel"><div className="admin-panel-title">Employee email list</div><p className="admin-panel-sub">Upload CSV: email,name,department. Emails are not shown publicly.</p><div className="allowlist-stats"><b>{state.allowlist?.eligible || 0}</b><span>eligible</span><b>{state.allowlist?.joined || 0}</b><span>joined</span><b>{state.allowlist?.remaining || 0}</b><span>left</span></div><div className="btn-row csv-actions"><button className="btn btn-ghost" onClick={downloadTemplate}>Download template</button><label className="file-upload">Choose CSV<input type="file" accept=".csv,text/csv" onChange={(e) => loadFile(e.target.files?.[0])} /></label></div><textarea className="csv-box" value={csvText} onChange={(e) => setCsvText(e.target.value)} /><CsvPreview preview={csvPreview} /><button className="btn btn-primary full" disabled={Boolean(state.draw) || !csvPreview.valid.length} onClick={uploadCsv}>Upload {csvPreview.valid.length || ""} employee{csvPreview.valid.length === 1 ? "" : "s"}</button></section>
+      <section className="admin-panel employee-panel"><div className="admin-panel-title">Employee email list</div><p className="admin-panel-sub">Add missed employees without disturbing joined players. Only use replace when restarting the setup list.</p><div className="allowlist-stats"><b>{state.allowlist?.eligible || 0}</b><span>eligible</span><b>{state.allowlist?.joined || 0}</b><span>joined</span><b>{state.allowlist?.remaining || 0}</b><span>left</span></div><div className="btn-row csv-actions"><button className="btn btn-ghost" onClick={downloadTemplate}>Download template</button><label className="file-upload">Choose CSV<input type="file" accept=".csv,text/csv" onChange={(e) => loadFile(e.target.files?.[0])} /></label></div><textarea className="csv-box" value={csvText} onChange={(e) => setCsvText(e.target.value)} placeholder="email,name,department" /><CsvPreview preview={csvPreview} /><div className="employee-action-stack"><button className="btn btn-primary employee-primary-action" disabled={Boolean(state.draw) || !csvPreview.valid.length} onClick={addEmployees}>{addEmployeeLabel}<span>keeps existing entries</span></button><button className="employee-danger-action" disabled={Boolean(state.draw) || !csvPreview.valid.length} onClick={replaceEmployeeList}>Replace full list<span>clears joined players before draw</span></button></div></section>
       <section className="admin-panel"><div className="admin-panel-title">Participants</div><p className="admin-panel-sub">Locked after draw.</p>{state.participants.map((p) => <div className="participant-chip" key={p.id}><div className="participant-avatar">{initials(p.name)}</div><div><div className="participant-name">{p.name}</div><div className="participant-dept">{p.department || "No department"}</div></div><button className="participant-delete" disabled={Boolean(state.draw)} onClick={() => action(`/api/participants/${p.id}`, { method: "DELETE" }, "Participant removed")}>×</button></div>)}{!state.participants.length && <Empty icon="👥" title="No participants" desc="Upload the employee list, then people can enter." />}</section>
     </div>
     <MatchAdmin state={state} action={action} />

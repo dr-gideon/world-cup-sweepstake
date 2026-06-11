@@ -288,3 +288,11 @@ A clean clone production-style dry-run passed on temp port `8108` with temp DB:
 - Tele drama feed now shows only cached summaries tied to finished matches from yesterday, using Europe/Dublin date comparison.
 - Removed the Tele fallback that showed older/all match-impact audit items when no current summaries matched.
 - Increased summary payload from latest 8 to latest 50 so yesterday's match summaries are still available after multiple generated items.
+
+## 2026-06-11 — Non-destructive employee add flow
+
+- Added admin-only append endpoint `/api/allowlist/append` for adding missed employees without clearing existing participants.
+- Admin UI now has separate buttons: `Add employees` and `Replace full list`.
+- `Replace full list` remains available before the draw but now shows a confirmation because it clears current participants.
+- Append smoke test confirmed adding a second CSV preserves existing participants.
+- Admin employee CSV panel polished: safer copy, clearer Add-vs-Replace hierarchy, full-width primary action, and subdued destructive replace action.
