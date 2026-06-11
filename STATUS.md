@@ -302,3 +302,10 @@ A clean clone production-style dry-run passed on temp port `8108` with temp DB:
 - Tele drama panel now shows `Latest drama` instead of yesterday-only summaries.
 - It prefers summaries tied to the latest finished match, then recent finished-match summaries, then any generated Tele summaries as fallback.
 - Football-Data auto-sync now runs once immediately on server startup, then continues on the configured interval.
+
+## 2026-06-11 — Preserve scores and avoid stale drama
+
+- Provider sync now preserves existing SQLite scores when Football-Data returns a finished match with `null` scores.
+- Automatic drama generation now skips finished matches without both scores present.
+- Tele `Latest drama` now only shows summaries tied to finished matches with real scores, and no longer falls back to stale/general summaries.
+- Smoke test confirmed provider `null/null` score payload does not erase an existing `2-0` result.

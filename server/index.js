@@ -157,7 +157,7 @@ async function runFootballDataSync({ dateFrom = "", dateTo = "", manual = false 
 
 async function generateDramaForFinishedMatches() {
   const state = getState();
-  const finished = (state.matches || []).filter((match) => match.status === "finished").slice(-12);
+  const finished = (state.matches || []).filter((match) => match.status === "finished" && match.homeScore !== null && match.homeScore !== undefined && match.awayScore !== null && match.awayScore !== undefined).slice(-12);
   let generated = 0;
   for (const match of finished) {
     const sourceKey = `match:${match.id}:${match.status}:${match.homeScore ?? ""}:${match.awayScore ?? ""}`;

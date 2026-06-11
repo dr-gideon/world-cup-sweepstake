@@ -294,18 +294,20 @@ function TelePage({ state }) {
 }
 
 function latestDramaSummaries(state) {
-  const summaries = state.teleSummaries || [];
-  const finished = [...(state.matches || [])].filter((match) => match.status === "finished").sort((a, b) => matchTime(b) - matchTime(a));
-  const matchSummaries = summaries.map((summary) => ({ ...summary, matchId: String(summary.sourceKey || "").match(/^match:([^:]+):/)?.[1] })).filter((summary) => summary.matchId);
-  if (finished.length) {
-    const latestMatchId = finished[0].id;
-    const latest = matchSummaries.filter((summary) => summary.matchId === latestMatchId);
-    if (latest.length) return latest;
-    const finishedIds = new Set(finished.map((match) => match.id));
-    const recentFinished = matchSummaries.filter((summary) => finishedIds.has(summary.matchId));
-    if (recentFinished.length) return recentFinished;
-  }
-  return summaries;
+  const scoredFinished = [...(state.matches || [])].filter((match) => match.status === "finished" && hasScore(match)).sort((a, b) => matchTime(b) - matchTime(a));
+  const matchSummaries = (state.teleSummaries || [])
+    .map((summary) => ({ ...summary, matchId: String(summary.sourceKey || "").match(/^match:([^:]+):/)?.[1] }))
+    .filter((summary) => summary.matchId);
+  if (!scoredFinished.length) return [];
+  const latestMatchId = scoredFinished[0].id;
+  const latest = matchSummaries.filter((summary) => summary.matchId === latestMatchId);
+  if (latest.length) return latest;
+  const scoredFinishedIds = new Set(scoredFinished.map((match) => match.id));
+  return matchSummaries.filter((summary) => scoredFinishedIds.has(summary.matchId));
+}
+
+function hasScore(match) {
+  return match.homeScore !== null && match.homeScore !== undefined && match.awayScore !== null && match.awayScore !== undefined;
 }
 
 function matchTime(match) {

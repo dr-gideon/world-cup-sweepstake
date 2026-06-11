@@ -269,14 +269,20 @@ export function upsertMatch(payload) {
   if (!home || !away) throw httpError(404, "Match team not found.");
   const id = payload.id || crypto.randomUUID();
   const status = ["scheduled", "live", "finished", "postponed"].includes(payload.status) ? payload.status : "scheduled";
-  const homeScore = payload.homeScore === "" || payload.homeScore === null || payload.homeScore === undefined ? null : Number(payload.homeScore);
-  const awayScore = payload.awayScore === "" || payload.awayScore === null || payload.awayScore === undefined ? null : Number(payload.awayScore);
+  const incomingHomeScore = payload.homeScore === "" || payload.homeScore === null || payload.homeScore === undefined ? null : Number(payload.homeScore);
+  const incomingAwayScore = payload.awayScore === "" || payload.awayScore === null || payload.awayScore === undefined ? null : Number(payload.awayScore);
+  const existing = db.prepare("SELECT home_score AS homeScore, away_score AS awayScore FROM matches WHERE id = ?").get(id);
+  const preserveExistingScore = payload.provider && payload.provider !== "manual" && incomingHomeScore === null && incomingAwayScore === null && existing && (existing.homeScore !== null || existing.awayScore !== null);
+  const homeScore = preserveExistingScore ? existing.homeScore : incomingHomeScore;
+  const awayScore = preserveExistingScore ? existing.awayScore : incomingAwayScore;
   db.prepare(`
     INSERT INTO matches (id, stage, kickoff, home_team_id, away_team_id, home_score, away_score, status, notes, updated_at, provider, provider_match_id)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       stage = excluded.stage, kickoff = excluded.kickoff, home_team_id = excluded.home_team_id, away_team_id = excluded.away_team_id,
-      home_score = excluded.home_score, away_score = excluded.away_score, status = excluded.status, notes = excluded.notes, updated_at = excluded.updated_at,
+      home_score = CASE WHEN excluded.provider != 'manual' AND excluded.home_score IS NULL AND excluded.away_score IS NULL THEN matches.home_score ELSE excluded.home_score END,
+      away_score = CASE WHEN excluded.provider != 'manual' AND excluded.home_score IS NULL AND excluded.away_score IS NULL THEN matches.away_score ELSE excluded.away_score END,
+      status = excluded.status, notes = excluded.notes, updated_at = excluded.updated_at,
       provider = excluded.provider, provider_match_id = excluded.provider_match_id
   `).run(id, String(payload.stage || "Group").trim() || "Group", String(payload.kickoff || "").trim(), homeTeamId, awayTeamId, homeScore, awayScore, status, String(payload.notes || "").trim(), new Date().toISOString(), payload.provider || "manual", payload.providerMatchId || "");
   audit("Match updated", `${home.flag} ${home.name} ${homeScore ?? "-"} — ${awayScore ?? "-"} ${away.flag} ${away.name} | ${status}`);

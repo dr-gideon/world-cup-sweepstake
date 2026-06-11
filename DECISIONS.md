@@ -172,3 +172,9 @@ Rationale: The original upload replaced the allowlist and cleared participants b
 Decision: Tele should show latest available match drama, not only yesterday's match drama.
 
 Rationale: During live tournament use, newly finished matches should appear on office TV immediately after sync, regardless of calendar day. Auto-sync should also run once at startup so restarted containers do not wait for the first interval before scores update.
+
+## 2026-06-11 — Never erase known scores with incomplete provider payloads
+
+Decision: If a non-manual provider returns `null` scores for an existing match, preserve the stored SQLite score. Tele drama should only show summaries tied to scored finished matches.
+
+Rationale: Football-Data can mark a match `FINISHED` while returning `null` scores. The app must not wipe known/manual results or show stale/generated drama for incomplete score data.
