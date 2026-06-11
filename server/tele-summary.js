@@ -7,6 +7,12 @@ export async function buildMatchDramaSummary({ match, providerConfig = {} }) {
   return generateSummary({ sourceKey, fallback, context: { match }, providerConfig });
 }
 
+const DEFAULT_TELE_DRAMA_PROMPT = [
+  "Write one short office-TV World Cup sweepstake roast for colleagues checking scores.",
+  "Tone: funny, sarcastic, mildly insulting, dry, Irish/UK office banter. No profanity, slurs, cruelty, HR disasters, or invented facts.",
+  "Make it punchy: headline max 12 words, body max 35 words. Tease the team or department if present, but do not use participant names."
+].join("\n");
+
 export async function buildTeleSummary({ state, providerConfig = {}, openAiKey = "", model = "gpt-4o-mini" }) {
   const sourceKey = makeSourceKey(state);
   const fallback = fallbackSummary(state);
@@ -18,9 +24,7 @@ async function generateSummary({ sourceKey, fallback, context, providerConfig })
   if (!config.key) return { sourceKey, ...fallback, provider: "fallback" };
   try {
     const prompt = [
-      "Write one short office-TV World Cup sweepstake roast for colleagues checking scores.",
-      "Tone: funny, sarcastic, mildly insulting, dry, Irish/UK office banter. No profanity, slurs, cruelty, HR disasters, or invented facts.",
-      "Make it punchy: headline max 12 words, body max 35 words. Tease the losing team owner or lucky winner if present.",
+      config.prompt || DEFAULT_TELE_DRAMA_PROMPT,
       "Return JSON only with keys headline and body.",
       `Context: ${JSON.stringify(context).slice(0, 5000)}`
     ].join("\n");
@@ -54,6 +58,7 @@ function normaliseProviderConfig(config = {}) {
     provider: "openrouter",
     key: config.openRouterKey,
     model: config.openRouterModel || "openai/gpt-4o-mini",
+    prompt: normalisePrompt(config.teleDramaPrompt),
     url: "https://openrouter.ai/api/v1/chat/completions",
     headers: { Authorization: `Bearer ${config.openRouterKey}`, "Content-Type": "application/json", "HTTP-Referer": "https://world-cup-sweepstake.local", "X-Title": "World Cup Sweepstake" }
   };
@@ -61,10 +66,15 @@ function normaliseProviderConfig(config = {}) {
     provider: "openai",
     key: config.openAiKey,
     model: config.model || config.openAiModel || "gpt-4o-mini",
+    prompt: normalisePrompt(config.teleDramaPrompt),
     url: "https://api.openai.com/v1/chat/completions",
     headers: { Authorization: `Bearer ${config.openAiKey}`, "Content-Type": "application/json" }
   };
   return { provider: "fallback", key: "" };
+}
+
+function normalisePrompt(prompt) {
+  return String(prompt || "").trim().replaceAll("\\n", "\n");
 }
 
 function makeSourceKey(state) {
@@ -83,14 +93,34 @@ function fallbackSummary(state) {
 }
 
 function compactContext(state) {
+  const compactAssignment = (assignment) => ({
+    team: assignment.team.name,
+    status: assignment.team.status,
+    department: assignment.participant.department || ""
+  });
   return {
     matches: (state.matches || []).slice(-6),
-    assignments: (state.assignments || []).map((assignment) => ({ participant: assignment.participant.name, team: assignment.team.name, status: assignment.team.status })).slice(0, 80),
-    impacts: (state.audit || []).filter((event) => event.event === "Match impact").slice(0, 6),
+    assignments: (state.assignments || []).map(compactAssignment).slice(0, 80),
+    impacts: (state.audit || []).filter((event) => event.event === "Match impact").slice(0, 6).map(compactImpact),
     prizes: {
-      winner: state.assignments?.find((assignment) => assignment.team.status === "winner") || null,
-      runnerUp: state.assignments?.find((assignment) => assignment.team.status === "runner-up") || null
+      winner: compactPrizeAssignment(state.assignments?.find((assignment) => assignment.team.status === "winner")),
+      runnerUp: compactPrizeAssignment(state.assignments?.find((assignment) => assignment.team.status === "runner-up"))
     }
+  };
+}
+
+function compactImpact(event) {
+  const [teamStatus, ownerText = ""] = String(event.detail || "").split("|").map((part) => part.trim());
+  const department = ownerText.includes(" · ") ? ownerText.split(" · ").slice(1).join(" · ").trim() : "";
+  return { at: event.at, detail: teamStatus, department };
+}
+
+function compactPrizeAssignment(assignment) {
+  if (!assignment) return null;
+  return {
+    team: assignment.team.name,
+    status: assignment.team.status,
+    department: assignment.participant.department || ""
   };
 }
 

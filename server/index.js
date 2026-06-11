@@ -168,7 +168,8 @@ function llmConfig() {
     openRouterKey: process.env.OPENROUTER_API_KEY || "",
     openRouterModel: process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini",
     openAiKey: process.env.OPENAI_API_KEY || "",
-    openAiModel: process.env.OPENAI_MODEL || "gpt-4o-mini"
+    openAiModel: process.env.OPENAI_MODEL || "gpt-4o-mini",
+    teleDramaPrompt: process.env.TELE_DRAMA_PROMPT || ""
   };
 }
 

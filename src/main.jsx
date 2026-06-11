@@ -281,17 +281,37 @@ function TeamsPage({ state }) {
 }
 
 function TelePage({ state }) {
-  const impacts = (state.audit || []).filter((event) => event.event === "Match impact");
-  const summaries = state.teleSummaries || [];
+  const yesterdayMatchIds = new Set((state.matches || []).filter((match) => match.status === "finished" && isYesterdayMatch(match)).map((match) => match.id));
+  const summaries = (state.teleSummaries || []).filter((summary) => {
+    const matchId = String(summary.sourceKey || "").match(/^match:([^:]+):/)?.[1];
+    return matchId && yesterdayMatchIds.has(matchId);
+  });
   return <main className="page tele-page">
     <div className="tele-frame tv-lite">
       <div className="tele-top"><span>OFFICE WORLD CUP SWEEPSTAKE</span><b>FIXTURES + DRAMA</b><span>{new Date().toLocaleTimeString("en-IE", { hour: "2-digit", minute: "2-digit" })}</span></div>
       <section className="tv-board">
         <div className="tele-card fixtures-card"><div className="section-label">Fixtures & results</div><TeleMatches matches={state.matches || []} /></div>
-        <div className="tele-card drama-card"><div className="section-label">Drama feed</div>{summaries.length ? summaries.slice(0, 5).map((summary) => <div className="impact-row roast-row" key={summary.id}><b>{summary.headline}</b><span>{summary.body}</span></div>) : impacts.length ? impacts.slice(0, 5).map((impact, i) => <div className="impact-row roast-row" key={i}><b>{impactHeadline(impact.detail)}</b><span>{impact.detail}</span></div>) : <Empty icon="📺" title="No drama yet" desc="Once results land, this screen will start causing HR-manageable trouble." />}</div>
+        <div className="tele-card drama-card"><div className="section-label">Yesterday's drama</div>{summaries.length ? summaries.slice(0, 5).map((summary) => <div className="impact-row roast-row" key={summary.id}><b>{summary.headline}</b><span>{summary.body}</span></div>) : <Empty icon="📺" title="No drama from yesterday" desc="Finished matches from yesterday will show here once summaries are generated." />}</div>
       </section>
     </div>
   </main>;
+}
+
+function isYesterdayMatch(match) {
+  const source = match.kickoff || match.updatedAt;
+  if (!source) return false;
+  return dublinDateKey(source) === dublinOffsetDateKey(-1);
+}
+
+function dublinOffsetDateKey(offsetDays = 0) {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDays);
+  return dublinDateKey(date);
+}
+
+function dublinDateKey(value) {
+  const date = value instanceof Date ? value : new Date(String(value).length === 16 ? `${value}:00Z` : value);
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Dublin", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
 }
 
 

@@ -404,7 +404,7 @@ export function getLatestTeleSummary() {
 }
 
 export function getTeleSummaries() {
-  return db.prepare("SELECT id, source_key AS sourceKey, headline, body, provider, created_at AS createdAt FROM tele_summaries ORDER BY created_at DESC LIMIT 8").all();
+  return db.prepare("SELECT id, source_key AS sourceKey, headline, body, provider, created_at AS createdAt FROM tele_summaries ORDER BY created_at DESC LIMIT 50").all();
 }
 
 export function hasTeleSummary(sourceKey) {

@@ -268,3 +268,23 @@ A clean clone production-style dry-run passed on temp port `8108` with temp DB:
 - Current Admin flow: protected `/admin`, clean Football-Data/Tele controls, provider status cards, match sync/import teams, cached Tele summary generation, auto-sync status.
 - Important env vars for Windows: `FOOTBALL_DATA_API_KEY`, `FOOTBALL_DATA_AUTO_SYNC=1`, `FOOTBALL_DATA_SYNC_INTERVAL_MINUTES=15`, `FOOTBALL_DATA_COMPETITION=WC`, `FOOTBALL_DATA_SEASON=2026`, `OPENROUTER_API_KEY`, `OPENROUTER_MODEL=openai/gpt-4o-mini`, `ADMIN_USER`, `ADMIN_PASSWORD`, `COOKIE_SECURE=0`.
 - Next sensible step: upload the real employee CSV on Windows, import teams, sync matches, do a final admin/Tele smoke, then share the public URL internally.
+
+## 2026-06-11 — Tele prompt configuration
+
+- Added optional `TELE_DRAMA_PROMPT` env var for OpenRouter/OpenAI Tele drama generation.
+- If unset, the app keeps the existing sarcastic office-safe default prompt.
+- The app still appends mandatory JSON output instructions and capped context after the configured prompt.
+- Literal `\n` sequences in the env var are converted to new lines.
+
+## 2026-06-11 — LLM privacy tightening
+
+- Removed participant names from OpenRouter/OpenAI Tele drama context.
+- LLM context now uses team name, team status, match data, and department where available.
+- Sanitized match-impact context so historical audit details do not pass owner names to the LLM.
+- Default prompt now explicitly says not to use participant names.
+
+## 2026-06-11 — Tele yesterday-only drama feed
+
+- Tele drama feed now shows only cached summaries tied to finished matches from yesterday, using Europe/Dublin date comparison.
+- Removed the Tele fallback that showed older/all match-impact audit items when no current summaries matched.
+- Increased summary payload from latest 8 to latest 50 so yesterday's match summaries are still available after multiple generated items.

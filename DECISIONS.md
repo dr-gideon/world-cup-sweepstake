@@ -148,3 +148,15 @@ Rationale: Dr. Wells wants people to glance at scores and laugh at the drama fee
 Decision: Draw should be personal and animated, but the full draw board should be collapsed by default.
 
 Rationale: The employee journey should focus on “what team did I get?” with drama. The full board is useful secondary information, not the main moment.
+
+## 2026-06-11 — Keep participant names out of LLM drama context
+
+Decision: OpenRouter/OpenAI Tele drama context should not include participant names. The LLM receives team names, team statuses, match data, and department where available.
+
+Rationale: The office app can still generate useful/funny Tele copy without sending colleague names to the external LLM provider. Emails were already excluded from public/Tele state.
+
+## 2026-06-11 — Tele shows yesterday's drama only
+
+Decision: The `/tele` drama feed should display only summaries for finished matches from yesterday, not all cached feed items or historical match-impact events.
+
+Rationale: The office TV should stay fresh and focused on recent match chatter instead of replaying stale tournament history.
