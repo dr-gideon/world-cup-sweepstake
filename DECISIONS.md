@@ -178,3 +178,9 @@ Rationale: During live tournament use, newly finished matches should appear on o
 Decision: If a non-manual provider returns `null` scores for an existing match, preserve the stored SQLite score. Tele drama should only show summaries tied to scored finished matches.
 
 Rationale: Football-Data can mark a match `FINISHED` while returning `null` scores. The app must not wipe known/manual results or show stale/generated drama for incomplete score data.
+
+## 2026-06-11 — Manual correction for imported fixtures
+
+Decision: Imported match rows must be editable from Admin, not only deletable.
+
+Rationale: Provider data can be incomplete or delayed. Organisers need a direct way to correct scores on the existing fixture so Tele and drama generation use the right result without creating duplicate matches.

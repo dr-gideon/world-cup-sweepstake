@@ -427,13 +427,33 @@ function MatchAdmin({ state, action }) {
   const first = state.teams[0]?.id || "";
   const second = state.teams[1]?.id || "";
   const [form, setForm] = useState({ stage: "Group", kickoff: "", homeTeamId: first, awayTeamId: second, homeScore: "", awayScore: "", status: "scheduled", notes: "" });
+  const [editingId, setEditingId] = useState("");
   useEffect(() => { setForm((current) => ({ ...current, homeTeamId: current.homeTeamId || first, awayTeamId: current.awayTeamId || second })); }, [first, second]);
   function update(patch) { setForm((current) => ({ ...current, ...patch })); }
   async function save() {
-    await action("/api/matches", { method: "POST", body: form }, "Match saved");
+    await action(editingId ? `/api/matches/${editingId}` : "/api/matches", { method: editingId ? "PATCH" : "POST", body: form }, editingId ? "Match updated" : "Match saved");
+    setEditingId("");
     setForm((current) => ({ ...current, homeScore: "", awayScore: "", notes: "" }));
   }
+  function editMatch(match) {
+    setEditingId(match.id);
+    setForm({
+      stage: match.stage || "Group",
+      kickoff: match.kickoff || "",
+      homeTeamId: match.homeTeamId,
+      awayTeamId: match.awayTeamId,
+      homeScore: match.homeScore ?? "",
+      awayScore: match.awayScore ?? "",
+      status: match.status || "scheduled",
+      notes: match.notes || ""
+    });
+  }
+  function cancelEdit() {
+    setEditingId("");
+    setForm((current) => ({ ...current, stage: "Group", kickoff: "", homeTeamId: first, awayTeamId: second, homeScore: "", awayScore: "", status: "scheduled", notes: "" }));
+  }
   return <section className="admin-panel wide match-admin"><div className="teams-header"><div><div className="admin-panel-title">Fixtures and results</div><p className="admin-panel-sub">Manual match layer now, live provider later. Tele reads from these results.</p></div></div>
+    {editingId && <Notice tone="warn">Editing existing match. Save will update the imported fixture instead of creating a duplicate.</Notice>}
     <div className="match-form">
       <input className="admin-input" value={form.stage} onChange={(e) => update({ stage: e.target.value })} placeholder="Stage" />
       <input className="admin-input" type="datetime-local" value={form.kickoff} onChange={(e) => update({ kickoff: e.target.value })} />
@@ -443,9 +463,10 @@ function MatchAdmin({ state, action }) {
       <input className="admin-input" type="number" min="0" value={form.awayScore} onChange={(e) => update({ awayScore: e.target.value })} placeholder="Away" />
       <select className="admin-select" value={form.status} onChange={(e) => update({ status: e.target.value })}><option value="scheduled">Scheduled</option><option value="live">Live</option><option value="finished">Finished</option><option value="postponed">Postponed</option></select>
       <input className="admin-input" value={form.notes} onChange={(e) => update({ notes: e.target.value })} placeholder="Notes" />
-      <button className="btn btn-primary" disabled={!form.homeTeamId || !form.awayTeamId || form.homeTeamId === form.awayTeamId} onClick={save}>Save match</button>
+      <button className="btn btn-primary" disabled={!form.homeTeamId || !form.awayTeamId || form.homeTeamId === form.awayTeamId} onClick={save}>{editingId ? "Update match" : "Save match"}</button>
+      {editingId && <button className="btn btn-ghost" onClick={cancelEdit}>Cancel edit</button>}
     </div>
-    <div className="match-list">{(state.matches || []).slice().reverse().map((match) => <div className="match-row" key={match.id}><span>{formatMatchDate(match.kickoff)}<small>{formatMatchTime(match.kickoff)}</small></span><b><TeamMark flag={match.homeFlag} name={match.homeName} /> {match.homeName}</b><strong>{scoreText(match)}</strong><b>{match.awayName} <TeamMark flag={match.awayFlag} name={match.awayName} /></b><em>{match.status}</em><button className="participant-delete" onClick={() => action(`/api/matches/${match.id}`, { method: "DELETE" }, "Match removed")}>×</button></div>)}{!(state.matches || []).length && <Empty icon="⚽" title="No matches yet" desc="Add fixtures or results manually for Tele." />}</div>
+    <div className="match-list">{(state.matches || []).slice().reverse().map((match) => <div className="match-row" key={match.id}><span>{formatMatchDate(match.kickoff)}<small>{formatMatchTime(match.kickoff)}</small></span><b><TeamMark flag={match.homeFlag} name={match.homeName} /> {match.homeName}</b><strong>{scoreText(match)}</strong><b>{match.awayName} <TeamMark flag={match.awayFlag} name={match.awayName} /></b><em>{match.status}</em><div className="match-row-actions"><button className="match-edit" onClick={() => editMatch(match)}>Edit</button><button className="participant-delete" onClick={() => action(`/api/matches/${match.id}`, { method: "DELETE" }, "Match removed")}>×</button></div></div>)}{!(state.matches || []).length && <Empty icon="⚽" title="No matches yet" desc="Add fixtures or results manually for Tele." />}</div>
   </section>;
 }
 

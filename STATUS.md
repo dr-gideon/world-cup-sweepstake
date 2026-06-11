@@ -309,3 +309,9 @@ A clean clone production-style dry-run passed on temp port `8108` with temp DB:
 - Automatic drama generation now skips finished matches without both scores present.
 - Tele `Latest drama` now only shows summaries tied to finished matches with real scores, and no longer falls back to stale/general summaries.
 - Smoke test confirmed provider `null/null` score payload does not erase an existing `2-0` result.
+
+## 2026-06-11 — Editable imported match results
+
+- Admin fixture rows now include an `Edit` action.
+- Editing loads the imported/manual match into the form and `Update match` patches the existing fixture instead of creating a duplicate.
+- This allows manual score correction when Football-Data marks a match finished but returns null scores.
