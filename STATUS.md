@@ -322,3 +322,10 @@ A clean clone production-style dry-run passed on temp port `8108` with temp DB:
 - Match list now sorts by kickoff ascending so the earliest fixture appears first.
 - Imported/manual fixture rows now expand inline for result editing instead of loading into the top add-match form.
 - Inline editor PATCHes the existing fixture with team IDs, score, status, and notes.
+
+## 2026-06-12 — Public backup button removed
+
+- Removed the public Enter-page `Export backup` button immediately after it was spotted on the employee-facing surface.
+- Removed the unused client-side JSON backup helper from `src/main.jsx`.
+- Admin-only backup/export links remain under `/admin` and still rely on authenticated server endpoints.
+- Verification passed: `npm test`, `npm run build`, and built public bundle no longer contains the `Export backup` button text.

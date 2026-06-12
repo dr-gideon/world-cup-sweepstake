@@ -142,7 +142,7 @@ function EnterPage({ state, action, setPage, setRegisteredNotice }) {
           <Stat value={Math.max(48 - state.participants.length, 0)} label="Slots left" />
           <Stat value="€80" label="Prize pot" gold />
         </div>
-        <div className="btn-row"><button className="btn btn-primary" onClick={() => setPage("draw")}>See draw stage →</button><button className="btn btn-ghost" onClick={() => downloadJson(state)}>Export backup</button></div>
+        <div className="btn-row"><button className="btn btn-primary" onClick={() => setPage("draw")}>See draw stage →</button></div>
       </section>
 
       <section className="entry-card">
@@ -606,7 +606,6 @@ function stageLabel(value) { return STAGES.find((stage) => stage.value === value
 function potColor(pot) { return ({ 1: { bg: "#FFD700", text: "#1a1200" }, 2: { bg: "#C0C0C0", text: "#111" }, 3: { bg: "#CD7F32", text: "#1a0800" }, 4: { bg: "#2a3050", text: "#9ba3c9" } })[pot] || { bg: "#2a3050", text: "#fff" }; }
 function initials(name) { return String(name || "?").split(/\s+/).slice(0,2).map((p) => p[0]).join("").toUpperCase(); }
 function impactHeadline(detail = "") { const [, owner = "Someone"] = detail.split("|").map((p) => p.trim()); if (detail.includes("→ eliminated")) return `${owner} just took a hit`; if (detail.includes("→ winner")) return `${owner} has won the sweepstake`; if (detail.includes("→ runner-up")) return `${owner} is in the €30 seat`; return `${owner} survives another round`; }
-function downloadJson(data) { const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = `world-cup-sweepstake-${new Date().toISOString().slice(0,10)}.json`; link.click(); URL.revokeObjectURL(url); }
 async function api(path, options = {}) { const hasText = Object.prototype.hasOwnProperty.call(options, "text"); const response = await fetch(path, { method: options.method || "GET", headers: hasText ? { "Content-Type": options.contentType || "text/plain" } : options.body ? { "Content-Type": "application/json" } : undefined, body: hasText ? options.text : options.body ? JSON.stringify(options.body) : undefined }); if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || `Request failed: ${response.status}`); } if (response.status === 204) return null; return response.json(); }
 
 createRoot(document.getElementById("root")).render(<App />);
