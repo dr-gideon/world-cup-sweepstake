@@ -15,12 +15,19 @@ const STAGES = [
 ];
 
 const PUBLIC_NAV = ["enter", "draw"];
+const REVEAL_AUDIO = {
+  1: ["/audio/reveal-pot-1-a.mp3", "/audio/reveal-pot-1-b.mp3"],
+  2: ["/audio/reveal-pot-2-a.mp3", "/audio/reveal-pot-2-b.mp3"],
+  3: ["/audio/reveal-pot-3-a.mp3", "/audio/reveal-pot-3-b.mp3"],
+  4: ["/audio/reveal-pot-4-a.mp3", "/audio/reveal-pot-4-b.mp3"]
+};
 
 function App() {
   const route = window.location.pathname;
   const isTeleRoute = route === "/tele";
+  const isStreamRoute = route === "/stream";
   const isAdminRoute = route === "/admin";
-  const [page, setPage] = useState(isTeleRoute ? "tele" : isAdminRoute ? "admin" : "enter");
+  const [page, setPage] = useState(isTeleRoute ? "tele" : isStreamRoute ? "stream" : isAdminRoute ? "admin" : "enter");
   const [state, setState] = useState(null);
   const [adminAuthed, setAdminAuthed] = useState(false);
   const [error, setError] = useState("");
@@ -43,11 +50,11 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const intervalMs = isTeleRoute ? 10000 : isAdminRoute ? 0 : 7000;
+    const intervalMs = isTeleRoute ? 10000 : isStreamRoute ? 3000 : isAdminRoute ? 0 : 7000;
     if (!intervalMs) return undefined;
     const id = setInterval(() => refresh(), intervalMs);
     return () => clearInterval(id);
-  }, [isTeleRoute, isAdminRoute]);
+  }, [isTeleRoute, isStreamRoute, isAdminRoute]);
 
   function showToast(message) {
     setToast(message);
@@ -85,6 +92,7 @@ function App() {
     {page === "enter" && <EnterPage state={state} action={action} setPage={setPage} setRegisteredNotice={setRegisteredNotice} />}
     {page === "draw" && <DrawPage state={state} action={action} setPage={setPage} />}
     {page === "tele" && <TelePage state={state} />}
+    {page === "stream" && <StreamPage state={state} />}
     {page === "admin" && <AdminGate authed={adminAuthed} setAuthed={setAdminAuthed} refresh={refresh}><AdminPage state={state} action={action} refresh={refresh} /></AdminGate>}
     {registeredNotice && <RegistrationModal notice={registeredNotice} onClose={() => setRegisteredNotice(null)} onDraw={() => { setRegisteredNotice(null); setPage("draw"); }} />}
     {toast && <div className="success-toast">{toast}</div>}
@@ -179,7 +187,7 @@ function RegistrationModal({ notice, onClose, onDraw }) {
       <div className="registered-badge">✓</div>
       <div className="registered-eyebrow">{notice.alreadyJoined ? "Already registered" : "You’re registered"}</div>
       <h2>{notice.name} is in the draw</h2>
-      <p>{notice.email} has been verified. {notice.alreadyJoined ? "You can head straight to the Draw page." : "We’ll remember this browser for the draw. If you come back from another device, just enter this email again to find your teams."}</p>
+      <p>{notice.email} has been verified. {notice.alreadyJoined ? "Go to the Draw page and enter this email to reveal your teams." : "When the draw opens, use this same work email on the Draw page to reveal your teams."}</p>
       <div className="btn-row center"><button className="btn btn-primary" onClick={onDraw}>Go to Draw stage →</button><button className="btn btn-ghost" onClick={onClose}>Stay here</button></div>
     </div>
   </div>;
@@ -194,11 +202,23 @@ function DrawPage({ state, action, setPage }) {
   const [spinning, setSpinning] = useState(false);
   const [spinIndex, setSpinIndex] = useState(0);
   const [showBoard, setShowBoard] = useState(false);
+  const [confetti, setConfetti] = useState([]);
+  const [soundOn, setSoundOn] = useState(true);
   const remembered = readRememberedParticipant();
-  const personalAssignments = lookup?.assignments?.length ? lookup.assignments : remembered?.id ? assignments.filter((assignment) => assignment.participant.id === remembered.id) : [];
+  const [nowMs, setNowMs] = useState(Date.now());
+  const serverOffsetMs = useMemo(() => state.serverNow ? new Date(state.serverNow).getTime() - Date.now() : 0, [state.serverNow]);
+  const drawStartsAt = state.settings?.drawStartsAt || "";
+  const drawStartMs = drawStartsAt ? new Date(drawStartsAt).getTime() : 0;
+  const drawRemainingMs = Math.max(0, drawStartMs - (nowMs + serverOffsetMs));
+  const personalAssignments = lookup?.assignments?.length ? lookup.assignments : [];
   const current = personalAssignments[revealIndex] || personalAssignments[0];
-  const isCurrentRevealed = current ? Boolean(revealedTeams[current.id]) : false;
+  const isCurrentRevealed = current ? Boolean(current.revealed || revealedTeams[current.id]) : false;
   const spinTeam = state.teams?.[spinIndex % Math.max(state.teams.length, 1)];
+
+  useEffect(() => {
+    const timer = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!spinning) return undefined;
@@ -209,6 +229,7 @@ function DrawPage({ state, action, setPage }) {
   async function findTeams(event) {
     event.preventDefault();
     if (!email.trim()) return;
+    setRevealedTeams({});
     const result = await api(`/api/participants/lookup?email=${encodeURIComponent(email)}`);
     setLookup(result);
     if (result.participant) localStorage.setItem("wcs_participant", JSON.stringify({ id: result.participant.id, email, name: result.participant.name }));
@@ -217,11 +238,17 @@ function DrawPage({ state, action, setPage }) {
 
   function startReveal() {
     if (!current || spinning) return;
+    playRevealAudio(current.team.pot, soundOn);
     setSpinning(true);
     setSpinIndex(Math.floor(Math.random() * Math.max(state.teams.length, 1)));
     setTimeout(() => {
       setSpinning(false);
       setRevealedTeams((existing) => ({ ...existing, [current.id]: true }));
+      action(`/api/assignments/${current.id}/reveal`, { method: "POST", body: { email } }).then((result) => {
+        if (result?.found) setLookup(result);
+      }).catch(() => {});
+      setConfetti(makeConfetti(current.team.pot));
+      setTimeout(() => setConfetti([]), 2400);
     }, 2200);
   }
 
@@ -229,14 +256,33 @@ function DrawPage({ state, action, setPage }) {
     setRevealIndex((index) => Math.min(index + 1, Math.max(personalAssignments.length - 1, 0)));
   }
 
+  function replayReveal() {
+    if (!current || spinning) return;
+    playRevealAudio(current.team.pot, soundOn);
+    setRevealedTeams((existing) => ({ ...existing, [current.id]: false }));
+    setSpinning(true);
+    setSpinIndex(Math.floor(Math.random() * Math.max(state.teams.length, 1)));
+    setTimeout(() => {
+      setSpinning(false);
+      setRevealedTeams((existing) => ({ ...existing, [current.id]: true }));
+      setConfetti(makeConfetti(current.team.pot));
+      setTimeout(() => setConfetti([]), 2400);
+    }, 2200);
+  }
+
   return <main className="page">
     <div className="hero-eyebrow">Draw Stage</div>
     <h1 className="hero-title small">{state.draw ? "Your team reveal." : "Ready to draw?"}</h1>
     <p className="hero-body">{state.draw ? "Find your entry and reveal your team draw with the drama it deserves." : "Once verified players have entered, the organiser will run the draw from Admin."}</p>
 
-    {!state.draw && <Empty icon="🎲" title="Draw hasn't run yet" desc="Enter with your work email, then come back when the organiser starts the draw." />}
+    <DrawTimePanel startsAt={drawStartsAt} remainingMs={drawRemainingMs} />
+
+    {!state.draw && <Empty icon="🎲" title="Draw hasn't run yet" desc={drawStartsAt ? "The draw time is set. Come back here when the countdown ends." : "Enter with your work email, then come back when the organiser starts the draw."} />}
+
+    {state.draw && <PotRevealSummary assignments={assignments} />}
 
     {state.draw && <section className="personal-reveal-layout centered">
+      {confetti.length > 0 && <Confetti pieces={confetti} />}
       <div className="reveal-card-stage">
         {personalAssignments.length ? <>
           <div className="reveal-count">Team {revealIndex + 1} of {personalAssignments.length}</div>
@@ -258,15 +304,70 @@ function DrawPage({ state, action, setPage }) {
               <h2>Ready?</h2>
             </>}
           </div>
-          <div className="btn-row center">{!isCurrentRevealed ? <button className="btn btn-primary" disabled={spinning} onClick={startReveal}>{spinning ? "Revealing…" : "Reveal my team"}</button> : <><button className="btn btn-primary" disabled={revealIndex >= personalAssignments.length - 1} onClick={nextReveal}>Next team →</button><button className="btn btn-ghost" onClick={() => { setRevealedTeams({}); setRevealIndex(0); }}>Start again</button></>}</div>
-        </> : <div className="entry-card find-card"><div className="entry-card-header"><div className="entry-card-eyebrow">Find my draw</div><div className="entry-card-title">Enter your email</div><div className="entry-card-sub">Same work email used to join</div></div><form className="entry-card-body" onSubmit={findTeams}><p>This browser does not know who entered. Type your work email to reveal your teams.</p>{lookup && !lookup.found && <Notice tone="warn">No draw entry found for that email.</Notice>}<Field label="Work email"><input className="form-input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@company.com" /></Field><button className="btn-enter" disabled={!email.trim()}>Find my teams</button></form></div>}
+          <div className="btn-row center">{!isCurrentRevealed ? <button className="btn btn-primary" disabled={spinning} onClick={startReveal}>{spinning ? "Revealing…" : "Reveal my team"}</button> : <><button className="btn btn-primary" disabled={revealIndex >= personalAssignments.length - 1} onClick={nextReveal}>Next team →</button><button className="btn btn-ghost" disabled={spinning} onClick={replayReveal}>Start again</button></>}<button className={`btn btn-ghost sound-toggle ${soundOn ? "on" : "off"}`} type="button" onClick={() => setSoundOn((value) => !value)}>Sound: {soundOn ? "On" : "Off"}</button></div>
+        </> : <div className="entry-card find-card"><div className="entry-card-header"><div className="entry-card-eyebrow">Email required</div><div className="entry-card-title">Find your draw</div><div className="entry-card-sub">Use the same work email used to join</div></div><form className="entry-card-body" onSubmit={findTeams}><p>Enter your verified work email before revealing. Browser memory is not used for the reveal.</p>{remembered?.email && !email && <Notice tone="ok">Tip: you joined earlier as {remembered.email}. Type that email below to continue.</Notice>}{lookup && !lookup.found && <Notice tone="warn">No draw entry found for that email.</Notice>}<Field label="Work email"><input className="form-input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@company.com" autoComplete="email" /></Field><button className="btn-enter" disabled={!email.trim()}>Find my teams</button></form></div>}
       </div>
     </section>}
 
-    {state.draw && <section className="full-board collapsed-board"><button className="board-toggle" onClick={() => setShowBoard((show) => !show)}><span>{showBoard ? "Hide full draw board" : "Show full draw board"}</span><em>{assignments.length} teams assigned</em></button>{showBoard && <div className="draw-grid compact">{assignments.map((assignment) => <DrawCard key={assignment.id} assignment={assignment} />)}</div>}</section>}
+    {state.draw && <LockedFullBoard assignments={assignments} showBoard={showBoard} setShowBoard={setShowBoard} />}
   </main>;
 }
 
+
+function Confetti({ pieces }) {
+  return <div className="confetti-layer" aria-hidden="true">{pieces.map((piece) => <span key={piece.id} className="confetti-piece" style={{ left: `${piece.left}%`, background: piece.color, animationDelay: `${piece.delay}ms`, animationDuration: `${piece.duration}ms`, transform: `rotate(${piece.rotate}deg)` }} />)}</div>;
+}
+
+function DrawTimePanel({ startsAt, remainingMs }) {
+  if (!startsAt) return null;
+  const open = remainingMs <= 0;
+  const parts = countdownParts(remainingMs);
+  return <div className={`countdown-panel ${open ? "open" : "locked"}`}>
+    <div className="countdown-copy">
+      <span className="countdown-label">{open ? "Draw time has arrived" : "Draw starts in"}</span>
+      <h2>{open ? "The draw is due now" : "World Cup draw countdown"}</h2>
+      <p>{open ? "Stay tuned for the organiser to run the draw." : `Draw scheduled for ${formatRevealTime(startsAt)}.`}</p>
+    </div>
+    <div className="countdown-units" aria-label={open ? "Draw time has arrived" : `Draw starts in ${formatCountdown(remainingMs)}`}>
+      <TimeUnit value={parts.days} label="Days" />
+      <TimeUnit value={parts.hours} label="Hours" />
+      <TimeUnit value={parts.minutes} label="Mins" />
+      <TimeUnit value={parts.seconds} label="Secs" pulse />
+    </div>
+  </div>;
+}
+
+function TimeUnit({ value, label, pulse }) {
+  return <div className={`time-unit ${pulse ? "pulse" : ""}`}><strong>{String(value).padStart(2, "0")}</strong><span>{label}</span></div>;
+}
+
+
+
+function PotRevealSummary({ assignments }) {
+  const rows = [1, 2, 3, 4].map((pot) => {
+    const potAssignments = assignments.filter((assignment) => assignment.team.pot === pot);
+    const revealed = potAssignments.filter((assignment) => assignment.revealed).length;
+    return { pot, total: potAssignments.length, revealed, remaining: potAssignments.length - revealed };
+  });
+  const totalRevealed = assignments.filter((assignment) => assignment.revealed).length;
+  return <section className="pot-reveal-summary">
+    <div className="pot-summary-head"><span>Sealed draw board</span><b>{totalRevealed} / {assignments.length} revealed</b></div>
+    <div className="pot-summary-grid">{rows.map((row) => <div className="pot-summary-card" key={row.pot}><strong>Pot {row.pot}</strong><div><b>{row.revealed}</b><span>revealed</span></div><div><b>{row.remaining}</b><span>still in pot</span></div></div>)}</div>
+  </section>;
+}
+
+
+function LockedFullBoard({ assignments, showBoard, setShowBoard }) {
+  const revealed = assignments.filter((assignment) => assignment.revealed).length;
+  const unlocked = assignments.length > 0 && revealed === assignments.length;
+  return <section className="full-board collapsed-board">
+    <button className={`board-toggle ${!unlocked ? "locked" : ""}`} disabled={!unlocked} onClick={() => setShowBoard((show) => !show)}>
+      <span>{unlocked ? showBoard ? "Hide full draw board" : "Show full draw board" : "Full draw board locked"}</span>
+      <em>{unlocked ? `${assignments.length} teams revealed` : `Unlocks after all reveals · ${revealed}/${assignments.length}`}</em>
+    </button>
+    {unlocked && showBoard && <div className="draw-grid compact">{assignments.map((assignment) => <DrawCard key={assignment.id} assignment={assignment} />)}</div>}
+  </section>;
+}
 
 function TeamsPage({ state }) {
   const [search, setSearch] = useState("");
@@ -277,6 +378,46 @@ function TeamsPage({ state }) {
     <div className="teams-header"><div><div className="hero-eyebrow">Team Board</div><h1 className="hero-title small">Who's still dreaming?</h1></div><input className="search-input" placeholder="Search team, owner, department…" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
     <div className="prizes-row"><Prize icon="🥇" amount="€50" label="Champion" text={prizes.winner ? `${prizes.winner.participant.name} — ${prizes.winner.team.name}` : "Waiting for final result"} /><Prize icon="🥈" amount="€30" label="Runner-up" text={prizes.runnerUp ? `${prizes.runnerUp.participant.name} — ${prizes.runnerUp.team.name}` : "Waiting for final result"} /><Prize icon="⚽" amount={aliveCount} label="Still alive" text="Manual status tracking" green /></div>
     {!state.draw ? <Empty icon="🏆" title="No board yet" desc="Run the draw first." /> : <div className="team-list">{rows.map((assignment) => <TeamRow key={assignment.id} assignment={assignment} />)}</div>}
+  </main>;
+}
+
+
+function StreamPage({ state }) {
+  const revealed = [...(state.assignments || [])].filter((assignment) => assignment.revealed).sort((a, b) => revealTime(b) - revealTime(a));
+  const latest = revealed[0];
+  const [soundEnabled, setSoundEnabled] = useState(false);
+  const [lastSeenId, setLastSeenId] = useState(latest?.id || "");
+  const [highlightId, setHighlightId] = useState("");
+  const [confetti, setConfetti] = useState([]);
+
+  useEffect(() => {
+    if (!latest?.id) return;
+    if (!lastSeenId) { setLastSeenId(latest.id); return; }
+    if (latest.id !== lastSeenId) {
+      setLastSeenId(latest.id);
+      setHighlightId(latest.id);
+      setConfetti(makeConfetti(latest.team.pot));
+      if (soundEnabled) playStreamAudio();
+      const timer = setTimeout(() => { setHighlightId(""); setConfetti([]); }, 2600);
+      return () => clearTimeout(timer);
+    }
+  }, [latest?.id, lastSeenId, soundEnabled]);
+
+  return <main className="page stream-page">
+    {confetti.length > 0 && <Confetti pieces={confetti} />}
+    <section className="stream-hero">
+      <div><div className="hero-eyebrow">Reveal Stream</div><h1 className="hero-title small">Live draw reveals.</h1><p className="hero-body">Auto-refreshing office screen for every revealed team.</p></div>
+      <button className="btn btn-primary stream-sound" onClick={() => setSoundEnabled((enabled) => !enabled)}>{soundEnabled ? "Sound enabled" : "Enable sound"}</button>
+    </section>
+    <PotRevealSummary assignments={state.assignments || []} />
+    {latest ? <section className={`latest-reveal-card ${highlightId === latest.id ? "new" : ""}`}>
+      <div className="latest-reveal-flag"><TeamMark flag={latest.team.flag} name={latest.team.name} /></div>
+      <div><span>Latest reveal</span><h2>{latest.participant.name} revealed {latest.team.name}</h2><p>{latest.team.code} · Pot {latest.team.pot} · {formatRevealStamp(latest.revealedAt)}</p></div>
+    </section> : <Empty icon="📺" title="No reveals yet" desc="This screen will light up as people reveal their teams." />}
+    <section className="reveal-feed">
+      <div className="section-label">Reveal feed</div>
+      {revealed.length ? revealed.slice(0, 24).map((assignment) => <div className={`reveal-feed-row ${highlightId === assignment.id ? "new" : ""}`} key={assignment.id}><span><TeamMark flag={assignment.team.flag} name={assignment.team.name} /></span><b>{assignment.participant.name}</b><strong>{assignment.team.name}</strong><em>Pot {assignment.team.pot}</em><small>{formatRevealStamp(assignment.revealedAt)}</small></div>) : <p className="stream-empty-copy">Waiting for the first reveal…</p>}
+    </section>
   </main>;
 }
 
@@ -512,10 +653,22 @@ function scoreText(match) {
 
 function AdminDrawControls({ state, action }) {
   const [seed, setSeed] = useState("office-2026");
+  const [drawStartsAt, setDrawStartsAt] = useState(toLocalDateTimeInput(state.settings?.drawStartsAt));
   const canDraw = !state.draw && state.participants.length > 0 && state.participants.length <= 48;
-  return <div className="admin-draw-controls">
-    {!state.draw && <><input className="seed-input" value={seed} onChange={(e) => setSeed(e.target.value)} /><button className="btn btn-primary" disabled={!canDraw} onClick={() => action("/api/draw", { method: "POST", body: { seed } }, "Draw complete")}>Run draw ({state.participants.length})</button></>}
-    {state.draw && <><button className="btn btn-primary" onClick={() => action("/api/reveal-next", { method: "POST" }, "Next team revealed")}>Reveal next</button><button className="btn btn-ghost" onClick={() => action("/api/reveal-all", { method: "POST" }, "All teams revealed")}>Reveal all</button></>}
+  useEffect(() => setDrawStartsAt(toLocalDateTimeInput(state.settings?.drawStartsAt)), [state.settings?.drawStartsAt]);
+  function saveDrawTime(value = drawStartsAt) {
+    return action("/api/settings", { method: "PATCH", body: { drawStartsAt: value ? new Date(value).toISOString() : "" } }, value ? "Draw time saved" : "Draw time cleared");
+  }
+  return <div className="admin-draw-stack">
+    <div className="admin-draw-controls">
+      {!state.draw && <><input className="seed-input" value={seed} onChange={(e) => setSeed(e.target.value)} /><button className="btn btn-primary" disabled={!canDraw} onClick={() => action("/api/draw", { method: "POST", body: { seed } }, "Draw complete")}>Run draw ({state.participants.length})</button></>}
+      {state.draw && <><button className="btn btn-primary" onClick={() => action("/api/reveal-next", { method: "POST" }, "Next team revealed")}>Reveal next</button><button className="btn btn-ghost" onClick={() => action("/api/reveal-all", { method: "POST" }, "All teams revealed")}>Reveal all</button></>}
+    </div>
+    <div className="countdown-admin">
+      <label><span>Draw time</span><input className="admin-input" type="datetime-local" value={drawStartsAt} onChange={(e) => setDrawStartsAt(e.target.value)} /></label>
+      <button className="btn btn-primary" disabled={!drawStartsAt} onClick={() => saveDrawTime()}>Save draw time</button>
+      <button className="btn btn-ghost" onClick={() => { setDrawStartsAt(""); saveDrawTime(""); }}>Clear draw time</button>
+    </div>
   </div>;
 }
 
@@ -551,6 +704,24 @@ function TeamMark({ flag, name }) {
   if (String(flag || "").startsWith("http")) return <img className="team-crest" src={flag} alt={`${name} crest`} loading="lazy" />;
   return <>{flag || "🏳️"}</>;
 }
+
+function revealTime(assignment) {
+  return assignment.revealedAt ? new Date(assignment.revealedAt).getTime() || 0 : 0;
+}
+function formatRevealStamp(value) {
+  if (!value) return "just now";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "just now";
+  return new Intl.DateTimeFormat("en-IE", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(date);
+}
+function playStreamAudio() {
+  try {
+    const audio = new Audio("/audio/stream-reveal.mp3");
+    audio.volume = 0.95;
+    audio.play().catch(() => {});
+  } catch {}
+}
+
 function flagText(flag) { return String(flag || "").startsWith("http") ? "🌐" : (flag || "🏳️"); }
 function Status({ status }) { return <span className={`status-badge ${status}`}>{stageLabel(status)}</span>; }
 function Stat({ value, label, gold }) { return <div className="stat-pill"><div className={`stat-pill-num ${gold ? "gold" : ""}`}>{value}</div><div className="stat-pill-label">{label}</div></div>; }
@@ -560,6 +731,59 @@ function Field({ label, optional, children }) { return <div className="form-grou
 function Notice({ tone, children }) { return <p className={`notice ${tone}`}>{children}</p>; }
 function Empty({ icon, title, desc }) { return <div className="empty-state"><div className="empty-state-icon">{icon}</div><div className="empty-state-title">{title}</div><div className="empty-state-desc">{desc}</div></div>; }
 function Splash({ text }) { return <div className="app splash"><div className="empty-state"><div className="empty-state-icon">🏆</div><div className="empty-state-title">{text}</div></div></div>; }
+
+
+
+function playRevealAudio(pot, enabled) {
+  if (!enabled) return;
+  const files = REVEAL_AUDIO[pot] || REVEAL_AUDIO[4] || [];
+  const file = files[Math.floor(Math.random() * files.length)];
+  if (!file) return;
+  try {
+    const audio = new Audio(file);
+    audio.volume = pot === 1 ? 0.82 : 0.72;
+    audio.play().catch(() => {});
+  } catch {}
+}
+
+function makeConfetti(pot = 4) {
+  const count = ({ 1: 72, 2: 58, 3: 46, 4: 38 })[pot] || 42;
+  const palette = ["#FFD700", "#ff8c00", "#ffffff", "#60a5fa", "#22c55e"];
+  return Array.from({ length: count }, (_, index) => ({
+    id: `${Date.now()}-${index}`,
+    left: 8 + Math.random() * 84,
+    color: palette[index % palette.length],
+    delay: Math.random() * 220,
+    duration: 1300 + Math.random() * 1000,
+    rotate: Math.random() * 360
+  }));
+}
+
+function countdownParts(ms) {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  return {
+    days: Math.floor(total / 86400),
+    hours: Math.floor((total % 86400) / 3600),
+    minutes: Math.floor((total % 3600) / 60),
+    seconds: total % 60
+  };
+}
+function formatCountdown(ms) {
+  const parts = countdownParts(ms);
+  return `${parts.days} days, ${parts.hours} hours, ${parts.minutes} minutes, ${parts.seconds} seconds`;
+}
+function toLocalDateTimeInput(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+function formatRevealTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "the scheduled time";
+  return new Intl.DateTimeFormat("en-IE", { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(date);
+}
 
 function readRememberedParticipant() {
   try { return JSON.parse(localStorage.getItem("wcs_participant") || "null"); } catch { return null; }

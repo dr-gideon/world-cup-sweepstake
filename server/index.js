@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fetchFootballDataMatches } from "./football-data.js";
 import { buildMatchDramaSummary, buildTeleSummary } from "./tele-summary.js";
-import { addParticipant, appendAllowlist, createDraw, createTeleSummary, exportBackupJson, exportNotJoinedCsv, exportParticipantsCsv, getState, hasTeleSummary, importAllowlist, importFootballDataTeams, initDb, lookupEmployee, lookupParticipantTeams, recordProviderSync, removeMatch, removeParticipant, resetSweepstake, revealAll, revealNext, syncFootballDataMatches, updateTeam, upsertMatch } from "./db.js";
+import { addParticipant, appendAllowlist, createDraw, createTeleSummary, exportBackupJson, exportNotJoinedCsv, exportParticipantsCsv, getState, hasTeleSummary, importAllowlist, importFootballDataTeams, initDb, lookupEmployee, lookupParticipantTeams, recordProviderSync, removeMatch, removeParticipant, resetSweepstake, revealAll, revealAssignmentForEmail, revealNext, syncFootballDataMatches, updateSettings, updateTeam, upsertMatch } from "./db.js";
 
 const app = express();
 const port = Number(process.env.PORT || 8097);
@@ -56,6 +56,8 @@ app.patch("/api/teams/:id", requireAdmin, wrap((req, res) => { updateTeam(req.pa
 app.post("/api/draw", requireAdmin, wrap((req, res) => { createDraw(req.body?.seed); res.status(201).json(getState()); }));
 app.post("/api/reveal-next", requireAdmin, wrap((req, res) => { revealNext(); res.json(getState()); }));
 app.post("/api/reveal-all", requireAdmin, wrap((req, res) => { revealAll(); res.json(getState()); }));
+app.post("/api/assignments/:id/reveal", wrap((req, res) => res.json(revealAssignmentForEmail(req.params.id, req.body?.email))));
+app.patch("/api/settings", requireAdmin, wrap((req, res) => { updateSettings(req.body || {}); res.json({ ...getState(), scheduler: schedulerStatus() }); }));
 app.post("/api/providers/football-data/import-teams", requireAdmin, wrap(async (req, res) => {
   const result = await fetchFootballDataMatches({
     apiKey: process.env.FOOTBALL_DATA_API_KEY,
@@ -86,6 +88,7 @@ app.delete("/api/matches/:id", requireAdmin, wrap((req, res) => { removeMatch(re
 app.post("/api/reset", requireAdmin, wrap((req, res) => { resetSweepstake(); res.json(getState()); }));
 
 app.use("/tele", (req, res, next) => { if (req.method !== "GET") return next(); res.type("html").send(readFileSync(indexPath, "utf8")); });
+app.use("/stream", (req, res, next) => { if (req.method !== "GET") return next(); res.type("html").send(readFileSync(indexPath, "utf8")); });
 app.use("/admin", (req, res, next) => { if (req.method !== "GET") return next(); res.type("html").send(readFileSync(indexPath, "utf8")); });
 
 if (existsSync(distPath)) {

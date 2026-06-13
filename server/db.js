@@ -51,7 +51,8 @@ export function initDb() {
       team_id TEXT NOT NULL REFERENCES teams(id),
       participant_id TEXT NOT NULL REFERENCES participants(id),
       draw_index INTEGER NOT NULL,
-      revealed INTEGER NOT NULL DEFAULT 0
+      revealed INTEGER NOT NULL DEFAULT 0,
+      revealed_at TEXT NOT NULL DEFAULT ''
     );
 
     CREATE TABLE IF NOT EXISTS audit_events (
@@ -97,8 +98,14 @@ export function initDb() {
       provider TEXT NOT NULL DEFAULT 'fallback',
       created_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL DEFAULT ''
+    );
   `);
   ensureMatchProviderColumns();
+  ensureAssignmentRevealColumns();
   const count = db.prepare("SELECT COUNT(*) AS count FROM teams").get().count;
   if (count !== 48) {
     db.exec("DELETE FROM assignments; DELETE FROM draws; DELETE FROM teams;");
@@ -124,7 +131,7 @@ export function getState() {
   const participants = db.prepare("SELECT id, name, department, created_at AS createdAt FROM participants ORDER BY created_at ASC").all();
   const teams = db.prepare("SELECT id, name, code, flag, pot, status, note FROM teams ORDER BY rowid ASC").all();
   const draw = db.prepare("SELECT id, seed, created_at AS createdAt, reveal_index AS revealIndex FROM draws ORDER BY created_at DESC LIMIT 1").get() || null;
-  const rawAssignments = draw ? db.prepare("SELECT id, team_id AS teamId, participant_id AS participantId, draw_index AS drawIndex, revealed FROM assignments WHERE draw_id = ? ORDER BY draw_index ASC").all(draw.id).map((assignment) => ({ ...assignment, revealed: Boolean(assignment.revealed) })) : [];
+  const rawAssignments = draw ? db.prepare("SELECT id, team_id AS teamId, participant_id AS participantId, draw_index AS drawIndex, revealed, revealed_at AS revealedAt FROM assignments WHERE draw_id = ? ORDER BY draw_index ASC").all(draw.id).map((assignment) => ({ ...assignment, revealed: Boolean(assignment.revealed) })) : [];
   const assignments = hydrateAssignments(rawAssignments, participants, teams);
   const auditEvents = db.prepare("SELECT at, event, detail FROM audit_events ORDER BY id DESC LIMIT 20").all();
   const allowlistStats = getAllowlistStats();
@@ -133,6 +140,8 @@ export function getState() {
   const teleSummary = getLatestTeleSummary();
   const teleSummaries = getTeleSummaries();
   return {
+    serverNow: new Date().toISOString(),
+    settings: getSettings(),
     registrationOpen: !draw,
     participants,
     teams,
@@ -215,8 +224,8 @@ export function createDraw(seed = "office-2026") {
   try {
     db.exec("DELETE FROM assignments; DELETE FROM draws;");
     db.prepare("INSERT INTO draws (id, seed, created_at, reveal_index) VALUES (?, ?, ?, ?)").run(draw.id, draw.seed, draw.createdAt, -1);
-    const insert = db.prepare("INSERT INTO assignments (id, draw_id, team_id, participant_id, draw_index, revealed) VALUES (?, ?, ?, ?, ?, ?)");
-    for (const assignment of draw.assignments) insert.run(assignment.id, draw.id, assignment.teamId, assignment.participantId, assignment.drawIndex, 0);
+    const insert = db.prepare("INSERT INTO assignments (id, draw_id, team_id, participant_id, draw_index, revealed, revealed_at) VALUES (?, ?, ?, ?, ?, ?, ?)");
+    for (const assignment of draw.assignments) insert.run(assignment.id, draw.id, assignment.teamId, assignment.participantId, assignment.drawIndex, 0, "");
     audit("Draw created", `${draw.assignments.length} teams assigned across ${participants.length} participants`);
     db.exec("COMMIT");
   } catch (error) {
@@ -225,19 +234,38 @@ export function createDraw(seed = "office-2026") {
   }
 }
 
+
+export function revealAssignmentForEmail(assignmentId, email) {
+  ensureParticipantEmailColumn();
+  const cleanEmail = normaliseEmail(email);
+  if (!cleanEmail) throw httpError(400, "Work email is required to reveal.");
+  const row = db.prepare(`
+    SELECT a.id, p.email, t.name AS teamName, t.flag AS teamFlag
+    FROM assignments a
+    JOIN participants p ON p.id = a.participant_id
+    JOIN teams t ON t.id = a.team_id
+    WHERE a.id = ?
+  `).get(String(assignmentId || ""));
+  if (!row) throw httpError(404, "Assignment not found.");
+  if (row.email !== cleanEmail) throw httpError(403, "That team belongs to a different email.");
+  db.prepare("UPDATE assignments SET revealed = 1, revealed_at = CASE WHEN revealed_at = '' THEN ? ELSE revealed_at END WHERE id = ?").run(new Date().toISOString(), row.id);
+  audit("Team revealed", `${row.teamFlag} ${row.teamName}`);
+  return lookupParticipantTeams(cleanEmail);
+}
+
 export function revealNext() {
   const draw = currentDraw();
   if (!draw) throw httpError(404, "No draw exists yet.");
   const nextIndex = Math.min(draw.reveal_index + 1, 47);
   db.prepare("UPDATE draws SET reveal_index = ? WHERE id = ?").run(nextIndex, draw.id);
-  db.prepare("UPDATE assignments SET revealed = 1 WHERE draw_id = ? AND draw_index <= ?").run(draw.id, nextIndex);
+  db.prepare("UPDATE assignments SET revealed = 1, revealed_at = CASE WHEN revealed_at = '' THEN ? ELSE revealed_at END WHERE draw_id = ? AND draw_index <= ?").run(new Date().toISOString(), draw.id, nextIndex);
 }
 
 export function revealAll() {
   const draw = currentDraw();
   if (!draw) throw httpError(404, "No draw exists yet.");
   db.prepare("UPDATE draws SET reveal_index = 47 WHERE id = ?").run(draw.id);
-  db.prepare("UPDATE assignments SET revealed = 1 WHERE draw_id = ?").run(draw.id);
+  db.prepare("UPDATE assignments SET revealed = 1, revealed_at = CASE WHEN revealed_at = '' THEN ? ELSE revealed_at END WHERE draw_id = ?").run(new Date().toISOString(), draw.id);
   audit("Draw fully revealed", "All assignments visible");
 }
 
@@ -389,6 +417,23 @@ export function recordProviderSync(provider, result) {
       requests_available = excluded.requests_available, reset_seconds = excluded.reset_seconds,
       imported = excluded.imported, skipped = excluded.skipped
   `).run(provider, new Date().toISOString(), result.status || "ok", result.message || "", result.requestsAvailable ?? null, result.resetSeconds ?? null, result.imported || 0, result.skipped || 0);
+}
+
+
+export function getSettings() {
+  const rows = db.prepare("SELECT key, value FROM app_settings").all();
+  const settings = Object.fromEntries(rows.map((row) => [row.key, row.value]));
+  return { drawStartsAt: settings.draw_starts_at || "" };
+}
+
+export function updateSettings(patch = {}) {
+  if (Object.prototype.hasOwnProperty.call(patch, "drawStartsAt")) {
+    const value = normaliseDateTime(patch.drawStartsAt);
+    db.prepare("INSERT INTO app_settings (key, value) VALUES ('draw_starts_at', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(value);
+    db.prepare("INSERT INTO app_settings (key, value) VALUES ('reveal_starts_at', '') ON CONFLICT(key) DO UPDATE SET value = ''").run();
+    audit("Draw time updated", value ? `Draw scheduled for ${value}` : "Draw time cleared");
+  }
+  return getSettings();
 }
 
 export function getProviderSync() {
@@ -594,7 +639,7 @@ export function exportBackupJson() {
     participants: db.prepare("SELECT email, name, department, created_at AS createdAt FROM participants ORDER BY created_at ASC").all(),
     teams: db.prepare("SELECT id, name, code, flag, pot, status, note FROM teams ORDER BY rowid ASC").all(),
     draws: db.prepare("SELECT id, seed, created_at AS createdAt, reveal_index AS revealIndex FROM draws ORDER BY created_at ASC").all(),
-    assignments: db.prepare("SELECT id, draw_id AS drawId, team_id AS teamId, participant_id AS participantId, draw_index AS drawIndex, revealed FROM assignments ORDER BY draw_index ASC").all(),
+    assignments: db.prepare("SELECT id, draw_id AS drawId, team_id AS teamId, participant_id AS participantId, draw_index AS drawIndex, revealed, revealed_at AS revealedAt FROM assignments ORDER BY draw_index ASC").all(),
     matches: db.prepare("SELECT id, stage, kickoff, home_team_id AS homeTeamId, away_team_id AS awayTeamId, home_score AS homeScore, away_score AS awayScore, status, notes, updated_at AS updatedAt, provider, provider_match_id AS providerMatchId FROM matches ORDER BY updated_at ASC").all(),
     audit: db.prepare("SELECT at, event, detail FROM audit_events ORDER BY id ASC").all()
   };
@@ -637,6 +682,14 @@ function normaliseEmail(value) {
   return /^\S+@\S+\.\S+$/.test(email) ? email : "";
 }
 
+function normaliseDateTime(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) throw httpError(400, "Reveal start time is invalid.");
+  return date.toISOString();
+}
+
 function parseCsv(text) {
   const rows = [];
   let row = [];
@@ -655,6 +708,12 @@ function parseCsv(text) {
   row.push(cell);
   if (row.some((v) => v.trim())) rows.push(row);
   return rows;
+}
+
+
+function ensureAssignmentRevealColumns() {
+  const columns = db.prepare("PRAGMA table_info(assignments)").all().map((column) => column.name);
+  if (columns.length && !columns.includes("revealed_at")) db.exec("ALTER TABLE assignments ADD COLUMN revealed_at TEXT NOT NULL DEFAULT ''");
 }
 
 function ensureMatchProviderColumns() {

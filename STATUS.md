@@ -329,3 +329,112 @@ A clean clone production-style dry-run passed on temp port `8108` with temp DB:
 - Removed the unused client-side JSON backup helper from `src/main.jsx`.
 - Admin-only backup/export links remain under `/admin` and still rely on authenticated server endpoints.
 - Verification passed: `npm test`, `npm run build`, and built public bundle no longer contains the `Export backup` button text.
+
+## 2026-06-12 — Production/server boundary
+
+- This VPS is Dr. Wells' personal/dev server for inspection and development.
+- Production is a separate company server.
+- The production deployment is Docker-based at `/opt/world-cup-sweepstake` on the company server.
+- Do not expect `/opt/world-cup-sweepstake` to exist on this VPS; absence here does not mean production is missing.
+
+## 2026-06-12 — Handoff after public export fix
+
+- Public backup/export exposure was removed from the employee Enter page and pushed in commit `12cd99b Remove public backup export button`.
+- Dr. Wells deployed the fix to the Linux Docker production server after pulling/rebuilding/restarting.
+- Future Linux production commands should be run from `/opt/world-cup-sweepstake`.
+- Use `docker compose down`, `git pull`, `docker compose up -d --build`; do not use `docker compose down -v` unless intentionally removing Docker volumes/data.
+
+## 2026-06-12 — Draw countdown local preview
+
+- Added a server-backed reveal countdown setting for the Draw page.
+- Admin Draw controls can now set reveal open time, start now, or clear the countdown.
+- Public Draw page shows the countdown using server time from `/api/state` and disables the reveal button until the countdown reaches zero.
+- Added `app_settings` SQLite table for lightweight app settings.
+- Local preview rebuilt and restarted on `http://100.86.180.12:8097/`.
+- Verification passed: `node --check server/index.js`, `node --check server/db.js`, `npm test`, `npm run build`, `git diff --check`, `/api/state` HTTP 200, and authenticated countdown set/clear smoke.
+
+## 2026-06-12 — Draw time placeholder simplification
+
+- Replaced the earlier reveal-lock countdown with a simpler public draw-time placeholder.
+- Admin Draw controls now show only `Draw time`, `Save draw time`, and `Clear draw time`; confusing `Start now` was removed.
+- Public Draw page now renders the draw countdown whenever a draw time is set, even before the draw has run, so employees can see when to come back.
+- Removed reveal-button locking from the countdown; this is now announcement/placeholder behavior only.
+- Settings API now stores `drawStartsAt` in SQLite `app_settings` under `draw_starts_at` and ignores the previous `reveal_starts_at` fallback.
+- Local preview rebuilt and restarted on `http://100.86.180.12:8097/`; production company server was not touched.
+- Verification passed: `node --check server/index.js`, `node --check server/db.js`, `npm test`, `npm run build`, authenticated draw time set/clear smoke, `/api/state` HTTP 200, and `git diff --check`.
+
+## 2026-06-12 — Draw countdown UI polish
+
+- Polished the public Draw page countdown card into a clearer event-style draw-time panel with separate Days/Hours/Mins/Secs blocks.
+- Fixed countdown jitter/stutter by memoizing the server-time offset instead of recalculating it on every render.
+- Countdown no longer disappears automatically when it reaches zero; it changes to a "Draw time has arrived" state and keeps the placeholder visible until Admin clears the draw time.
+- Local preview rebuilt and restarted on `http://100.86.180.12:8097/`; production company server was not touched.
+- Verification passed: `node --check server/index.js`, `node --check server/db.js`, `npm test`, `npm run build`, `git diff --check`, `/api/state` HTTP 200, and served bundle readback.
+
+## 2026-06-12 — Email required for personal reveal
+
+- Updated Draw page personal reveal flow so assignments are only shown after an email lookup succeeds.
+- Removed the browser-memory fallback from reveal selection; local browser memory can suggest the previous email, but it no longer unlocks reveal by itself.
+- Updated registration confirmation and Draw copy to say the same work email is required for reveal.
+- Local preview rebuilt and restarted on `http://100.86.180.12:8097/`; production company server was not touched.
+- Verification passed: `npm run build`, `npm test`, `git diff --check`, source readback confirmed no remembered-participant fallback, `/api/state` HTTP 200, and served bundle readback.
+
+## 2026-06-13 — Reveal confetti and pot audio
+
+- Added local reveal audio assets under `public/audio/`, copied from `/home/giddy/temp/sound/` and normalized to `reveal-pot-<pot>-a/b.mp3`.
+- Draw reveal now plays one random audio sting for the revealed team pot: 2 files per pot, 8 files total.
+- Added lightweight in-app confetti burst on reveal, with intensity scaled by pot and `prefers-reduced-motion` respected.
+- Added a `Sound on/off` toggle next to reveal controls; audio failure is non-blocking so reveal continues silently if blocked or muted.
+- Local preview rebuilt and restarted on `http://100.86.180.12:8097/`; production company server was not touched.
+- Verification passed: `npm run build`, `npm test`, `git diff --check`, `/api/state` HTTP 200, served bundle readback, and all 8 audio files returned HTTP 200 from preview.
+
+## 2026-06-13 — Sealed model personal reveal
+
+- Converted personal reveal into a persisted sealed-draw flow: Admin draw still assigns all teams up front, but each personal reveal now marks that assignment as revealed in SQLite.
+- Added public reveal endpoint `POST /api/assignments/:id/reveal` that requires the matching participant email and rejects wrong-email reveal attempts.
+- Draw page now treats browser/local state as temporary only; persisted `assignment.revealed` controls what is visible across browsers and refreshes.
+- Added sealed draw summary on Draw page showing total revealed and per-pot revealed/still-in-pot counts.
+- Full draw board continues to show hidden placeholders for unrevealed assignments and team/owner only after reveal.
+- Local preview rebuilt and restarted on `http://100.86.180.12:8097/`; production company server was not touched.
+- Verification passed: temp SQLite sealed-reveal smoke including wrong-email rejection, `node --check server/index.js`, `node --check server/db.js`, `npm test`, `npm run build`, `git diff --check`, `/api/state` HTTP 200, and served bundle readback.
+
+## 2026-06-13 — Reveal stream page
+
+- Added `/stream` as a standalone office-screen reveal stream page.
+- Stream auto-refreshes every 3 seconds and shows latest reveal, reveal feed, and the existing sealed pot summary.
+- Added persisted `revealed_at` timestamps to assignments so stream ordering is stable across refreshes and browsers.
+- Personal reveal now stores `revealed_at` the first time an assignment is revealed; admin reveal-next/reveal-all also backfill timestamps.
+- Added `Enable sound` stream control. After user enables sound, new reveals detected by auto-refresh play a short generated drumroll/pop via Web Audio and highlight the latest card.
+- `/stream` is served by the Express SPA router alongside `/`, `/tele`, and `/admin`.
+- Local preview rebuilt and restarted on `http://100.86.180.12:8097/stream`; production company server was not touched.
+- Verification passed: temp SQLite timestamp smoke, `node --check server/index.js`, `node --check server/db.js`, `npm test`, `npm run build`, `git diff --check`, `/api/state` HTTP 200, `/stream` HTTP 200, and served bundle readback.
+
+## 2026-06-13 — Reveal UX fixes from simulation
+
+- During temp simulation testing, Dr. Wells found `Start again` was misleading after a persisted sealed reveal and the sound state was unclear.
+- Replaced `Start again` with `Reveal another email`, which clears the email lookup and returns to the email-required reveal form.
+- Clarified reveal audio toggle copy to `Sound: On/Off` with distinct on/off styling.
+- Locked the full draw board until all 48 assignments are revealed; before then it shows progress and cannot be opened.
+- Rebuilt and restarted both the main local preview (`8097`) and temp simulation server (`8110`); production company server was not touched.
+- Verification passed: `npm run build`, `npm test`, `git diff --check`, main `/api/state` HTTP 200, sim `/api/state` HTTP 200, sim `/stream` HTTP 200, and sim served bundle readback.
+
+## 2026-06-13 — Reveal replay button correction
+
+- Dr. Wells confirmed audio works and corrected the reveal UX: users should not be invited to reveal another email from the post-reveal state.
+- Replaced `Reveal another email` with `Start again` as a replay-only action for the same verified assignment.
+- `Start again` now reruns the reveal animation, pot audio, and confetti locally without clearing the email lookup or changing persisted sealed reveal state.
+- Rebuilt and restarted both main preview (`8097`) and temp simulation server (`8110`); production company server was not touched.
+- Verification passed: `npm run build`, `npm test`, `git diff --check`, main `/api/state` HTTP 200, sim `/api/state` HTTP 200, and sim served bundle readback.
+
+## 2026-06-13 — Stream reveal confetti and audio asset
+
+- Added stream-page confetti when a new reveal appears via auto-refresh.
+- Replaced the mild generated stream sound with Dr. Wells' provided `/home/giddy/temp/sound/stream.mp3`, copied to `public/audio/stream-reveal.mp3`.
+- Stream page now plays the provided audio at higher volume when sound is enabled and a new reveal is detected.
+- Rebuilt and restarted both main preview (`8097`) and temp simulation server (`8110`); production company server was not touched.
+- Verification passed: `npm run build`, `npm test`, `git diff --check`, main/sim `/api/state` HTTP 200, sim stream bundle readback, and `stream-reveal.mp3` HTTP 200.
+
+## 2026-06-13 — Temp simulation stopped
+
+- Stopped the isolated temp simulation server on port `8110` after end-to-end testing passed.
+- Final local gate before commit/push prep passed: `npm run build`, `npm test`, and `git diff --check`.
