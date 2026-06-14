@@ -640,3 +640,11 @@ A clean clone production-style dry-run passed on temp port `8108` with temp DB:
 - Added a targeted temp SQLite sealed-state smoke: public state sealed unrevealed teams, personal lookup kept reveal target, Journey stayed locked before reveal, Journey opened after reveal, scheduled comments were hidden from Tele, and finished scored comments appeared.
 - Restarted main local preview on `8097`; isolated simulation remains stopped.
 - Production company server was not touched.
+
+## 2026-06-14 — Audited sweepstake polish pushed
+
+- Dr. Wells gave the magic phrase `run barry run` for the World Cup Sweepstake push.
+- Re-ran pre-push gates immediately before commit: `npm test`, `npm run build`, and `git diff --check` all passed.
+- Committed and pushed audited reveal/Journey/Tele polish to `origin/main` as `9cca225` (`Polish sweepstake reveal and tele flows`).
+- Pushed changes include sealed public assignment state, Journey reveal locking, filtered Tele manager comments, compact public manager names, Draw/Stream/Journey/Tele UI polish, and updated project decision/status logs.
+- Production company server was not touched; this was repository push only.
