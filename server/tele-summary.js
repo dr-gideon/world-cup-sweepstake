@@ -7,10 +7,38 @@ export async function buildMatchDramaSummary({ match, providerConfig = {} }) {
   return generateSummary({ sourceKey, fallback, context: { match }, providerConfig });
 }
 
+export async function buildManagerCommentDramaSummary({ sourceKey, candidate, providerConfig = {} }) {
+  const managerTeam = candidate.teamName;
+  const fallback = {
+    headline: `${managerTeam} manager enters the evidence locker`,
+    body: `Before kickoff: “${candidate.comment}”. Final score: ${candidate.homeCode} ${scoreText(candidate)} ${candidate.awayCode}. The Drama Feed will allow the office to draw its own conclusions.`
+  };
+  const context = {
+    team: managerTeam,
+    managerComment: candidate.comment,
+    match: {
+      stage: candidate.stage,
+      home: candidate.homeName,
+      away: candidate.awayName,
+      score: `${candidate.homeScore} : ${candidate.awayScore}`,
+      status: candidate.status
+    }
+  };
+  return generateSummary({ sourceKey, fallback, context, providerConfig, promptOverride: MANAGER_COMMENT_PROMPT });
+}
+
 const DEFAULT_TELE_DRAMA_PROMPT = [
   "Write one short office-TV World Cup sweepstake roast for colleagues checking scores.",
   "Tone: funny, sarcastic, mildly insulting, dry, Irish/UK office banter. No profanity, slurs, cruelty, HR disasters, or invented facts.",
   "Make it punchy: headline max 12 words, body max 35 words. Tease the team or department if present, but do not use participant names."
+].join("\n");
+
+const MANAGER_COMMENT_PROMPT = [
+  "Write one short office-TV World Cup sweepstake Drama Feed item.",
+  "The participant is a team manager. Use only the supplied team, manager comment, and match result.",
+  "Do not use or invent names, emails, departments, identities, or private details.",
+  "Tone: funny, sarcastic, dry, Irish/UK office banter. No profanity, slurs, cruelty, HR disasters, or invented facts.",
+  "Make it punchy: headline max 12 words, body max 35 words. You may paraphrase the manager comment but keep it office-safe."
 ].join("\n");
 
 export async function buildTeleSummary({ state, providerConfig = {}, openAiKey = "", model = "gpt-4o-mini" }) {
@@ -19,12 +47,12 @@ export async function buildTeleSummary({ state, providerConfig = {}, openAiKey =
   return generateSummary({ sourceKey, fallback, context: compactContext(state), providerConfig: providerConfig.openRouterKey || providerConfig.openAiKey ? providerConfig : { openAiKey, model } });
 }
 
-async function generateSummary({ sourceKey, fallback, context, providerConfig }) {
+async function generateSummary({ sourceKey, fallback, context, providerConfig, promptOverride = "" }) {
   const config = normaliseProviderConfig(providerConfig);
   if (!config.key) return { sourceKey, ...fallback, provider: "fallback" };
   try {
     const prompt = [
-      config.prompt || DEFAULT_TELE_DRAMA_PROMPT,
+      promptOverride || config.prompt || DEFAULT_TELE_DRAMA_PROMPT,
       "Return JSON only with keys headline and body.",
       `Context: ${JSON.stringify(context).slice(0, 5000)}`
     ].join("\n");

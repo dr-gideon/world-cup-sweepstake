@@ -99,6 +99,18 @@ export function initDb() {
       created_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS manager_comments (
+      id TEXT PRIMARY KEY,
+      assignment_id TEXT NOT NULL REFERENCES assignments(id) ON DELETE CASCADE,
+      team_id TEXT NOT NULL REFERENCES teams(id),
+      match_id TEXT NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+      comment TEXT NOT NULL,
+      hidden INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE(assignment_id, match_id)
+    );
+
     CREATE TABLE IF NOT EXISTS app_settings (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL DEFAULT ''
@@ -131,8 +143,8 @@ export function getState() {
   const participants = db.prepare("SELECT id, name, department, created_at AS createdAt FROM participants ORDER BY created_at ASC").all();
   const teams = db.prepare("SELECT id, name, code, flag, pot, status, note FROM teams ORDER BY rowid ASC").all();
   const draw = db.prepare("SELECT id, seed, created_at AS createdAt, reveal_index AS revealIndex FROM draws ORDER BY created_at DESC LIMIT 1").get() || null;
+  const assignments = draw ? publicAssignments(hydratedAssignments(draw.id, participants, teams)) : [];
   const rawAssignments = draw ? db.prepare("SELECT id, team_id AS teamId, participant_id AS participantId, draw_index AS drawIndex, revealed, revealed_at AS revealedAt FROM assignments WHERE draw_id = ? ORDER BY draw_index ASC").all(draw.id).map((assignment) => ({ ...assignment, revealed: Boolean(assignment.revealed) })) : [];
-  const assignments = hydrateAssignments(rawAssignments, participants, teams);
   const auditEvents = db.prepare("SELECT at, event, detail FROM audit_events ORDER BY id DESC LIMIT 20").all();
   const allowlistStats = getAllowlistStats();
   const matches = getMatches();
@@ -152,8 +164,22 @@ export function getState() {
     matches,
     providerSync,
     teleSummary,
-    teleSummaries
+    teleSummaries,
+    teleManagerComments: getTeleManagerComments(),
+    managerCommentStats: getManagerCommentStats()
   };
+}
+
+function hydratedAssignments(drawId, participants, teams) {
+  const rawAssignments = db.prepare("SELECT id, team_id AS teamId, participant_id AS participantId, draw_index AS drawIndex, revealed, revealed_at AS revealedAt FROM assignments WHERE draw_id = ? ORDER BY draw_index ASC").all(drawId).map((assignment) => ({ ...assignment, revealed: Boolean(assignment.revealed) }));
+  return hydrateAssignments(rawAssignments, participants, teams);
+}
+
+function publicAssignments(assignments) {
+  return assignments.map((assignment) => assignment.revealed ? assignment : {
+    ...assignment,
+    team: { id: `sealed-${assignment.id}`, name: "Sealed team", code: "???", flag: "🎁", pot: 0, status: "sealed", note: "Revealed only after the manager opens their draw." }
+  });
 }
 
 export function addParticipant({ email, name, department = "" }) {
@@ -270,7 +296,7 @@ export function revealAll() {
 }
 
 export function resetSweepstake() {
-  db.exec("DELETE FROM assignments; DELETE FROM draws; DELETE FROM participants; DELETE FROM matches; UPDATE teams SET status = 'active';");
+  db.exec("DELETE FROM manager_comments; DELETE FROM assignments; DELETE FROM draws; DELETE FROM participants; DELETE FROM matches; UPDATE teams SET status = 'active';");
   audit("Sweepstake reset", "Participants, draw, results, and matches cleared. Employee allowlist kept.");
 }
 
@@ -321,6 +347,112 @@ export function removeMatch(id) {
   const result = db.prepare("DELETE FROM matches WHERE id = ?").run(id);
   if (!result.changes) throw httpError(404, "Match not found.");
   audit("Match removed", id);
+}
+
+export function getJourneyForEmail(email) {
+  ensureParticipantEmailColumn();
+  const cleanEmail = normaliseEmail(email);
+  if (!cleanEmail) throw httpError(400, "Work email is required.");
+  const lookup = lookupParticipantTeams(cleanEmail);
+  if (!lookup.found) return { found: false, participant: null, assignments: [], matches: [], comments: [] };
+  const revealedAssignments = lookup.assignments.filter((assignment) => assignment.revealed);
+  const teamIds = revealedAssignments.map((assignment) => assignment.team.id);
+  if (!teamIds.length) return { ...lookup, assignments: [], matches: [], comments: [] };
+  const placeholders = teamIds.map(() => "?").join(",");
+  const matches = db.prepare(`
+    SELECT
+      m.id, m.stage, m.kickoff, m.home_team_id AS homeTeamId, m.away_team_id AS awayTeamId,
+      m.home_score AS homeScore, m.away_score AS awayScore, m.status, m.notes, m.updated_at AS updatedAt, m.provider,
+      ht.name AS homeName, ht.code AS homeCode, ht.flag AS homeFlag,
+      at.name AS awayName, at.code AS awayCode, at.flag AS awayFlag
+    FROM matches m
+    JOIN teams ht ON ht.id = m.home_team_id
+    JOIN teams at ON at.id = m.away_team_id
+    WHERE m.home_team_id IN (${placeholders}) OR m.away_team_id IN (${placeholders})
+    ORDER BY COALESCE(NULLIF(m.kickoff, ''), m.updated_at) ASC, m.updated_at DESC
+  `).all(...teamIds, ...teamIds);
+  const assignmentIds = revealedAssignments.map((assignment) => assignment.id);
+  const assignmentPlaceholders = assignmentIds.map(() => "?").join(",");
+  const comments = db.prepare(`
+    SELECT id, assignment_id AS assignmentId, team_id AS teamId, match_id AS matchId, comment, hidden, created_at AS createdAt, updated_at AS updatedAt
+    FROM manager_comments
+    WHERE assignment_id IN (${assignmentPlaceholders}) AND hidden = 0
+    ORDER BY updated_at DESC
+  `).all(...assignmentIds).map((row) => ({ ...row, hidden: Boolean(row.hidden) }));
+  return { ...lookup, assignments: revealedAssignments, matches, comments };
+}
+
+export function upsertManagerComment({ assignmentId, matchId, email, comment }) {
+  ensureParticipantEmailColumn();
+  const cleanEmail = normaliseEmail(email);
+  if (!cleanEmail) throw httpError(400, "Work email is required.");
+  const cleanComment = cleanManagerComment(comment);
+  const row = db.prepare(`
+    SELECT a.id AS assignmentId, a.team_id AS teamId, p.email, t.name AS teamName, m.kickoff, m.status, m.home_team_id AS homeTeamId, m.away_team_id AS awayTeamId
+    FROM assignments a
+    JOIN participants p ON p.id = a.participant_id
+    JOIN teams t ON t.id = a.team_id
+    JOIN matches m ON m.id = ? AND (m.home_team_id = a.team_id OR m.away_team_id = a.team_id)
+    WHERE a.id = ?
+  `).get(String(matchId || ""), String(assignmentId || ""));
+  if (!row) throw httpError(404, "Team fixture not found.");
+  if (row.email !== cleanEmail) throw httpError(403, "That team belongs to a different email.");
+  if (row.status !== "scheduled") throw httpError(409, "Manager comments close once the match starts.");
+  if (row.kickoff) {
+    const kickoffMs = new Date(String(row.kickoff).length === 16 ? `${row.kickoff}:00Z` : row.kickoff).getTime();
+    if (Number.isFinite(kickoffMs) && Date.now() >= kickoffMs) throw httpError(409, "Manager comments close at kickoff.");
+  }
+  const existing = db.prepare("SELECT id FROM manager_comments WHERE assignment_id = ? AND match_id = ?").get(row.assignmentId, String(matchId || ""));
+  const id = existing?.id || crypto.randomUUID();
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO manager_comments (id, assignment_id, team_id, match_id, comment, hidden, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, 0, ?, ?)
+    ON CONFLICT(assignment_id, match_id) DO UPDATE SET comment = excluded.comment, hidden = 0, updated_at = excluded.updated_at
+  `).run(id, row.assignmentId, row.teamId, String(matchId || ""), cleanComment, now, now);
+  audit("Manager comment added", `${row.teamName} manager commented before kickoff`);
+  return getJourneyForEmail(cleanEmail);
+}
+
+export function getManagerCommentDramaCandidates() {
+  return db.prepare(`
+    SELECT
+      c.id AS commentId, c.comment, c.team_id AS teamId,
+      t.name AS teamName, t.code AS teamCode, t.flag AS teamFlag,
+      m.id AS matchId, m.stage, m.kickoff, m.home_score AS homeScore, m.away_score AS awayScore, m.status,
+      ht.name AS homeName, ht.code AS homeCode, ht.flag AS homeFlag,
+      at.name AS awayName, at.code AS awayCode, at.flag AS awayFlag
+    FROM manager_comments c
+    JOIN teams t ON t.id = c.team_id
+    JOIN matches m ON m.id = c.match_id
+    JOIN teams ht ON ht.id = m.home_team_id
+    JOIN teams at ON at.id = m.away_team_id
+    WHERE c.hidden = 0 AND m.status = 'finished' AND m.home_score IS NOT NULL AND m.away_score IS NOT NULL
+    ORDER BY COALESCE(NULLIF(m.kickoff, ''), m.updated_at) DESC, c.updated_at DESC
+    LIMIT 20
+  `).all();
+}
+
+function getTeleManagerComments() {
+  return db.prepare(`
+    SELECT
+      c.id, c.match_id AS matchId, c.team_id AS teamId, c.comment, c.created_at AS createdAt,
+      t.name AS teamName, t.code AS teamCode, t.flag AS teamFlag,
+      p.name AS managerName
+    FROM manager_comments c
+    JOIN teams t ON t.id = c.team_id
+    JOIN assignments a ON a.id = c.assignment_id
+    JOIN participants p ON p.id = a.participant_id
+    JOIN matches m ON m.id = c.match_id
+    WHERE c.hidden = 0 AND m.status = 'finished' AND m.home_score IS NOT NULL AND m.away_score IS NOT NULL
+    ORDER BY c.created_at DESC
+    LIMIT 80
+  `).all().map((row) => ({
+    ...row,
+    managerDisplayName: shortDisplayName(row.managerName),
+    managerInitials: initials(row.managerName),
+    managerName: undefined
+  }));
 }
 
 export function importFootballDataTeams(matches, throttling = {}) {
@@ -615,8 +747,10 @@ export function lookupParticipantTeams(email) {
   if (!cleanEmail) throw httpError(400, "Email is required.");
   const participant = db.prepare("SELECT id, name, department FROM participants WHERE email = ?").get(cleanEmail);
   if (!participant) return { found: false, participant: null, assignments: [] };
-  const state = getState();
-  return { found: true, participant, assignments: state.assignments.filter((assignment) => assignment.participant.id === participant.id) };
+  const teams = db.prepare("SELECT id, name, code, flag, pot, status, note FROM teams ORDER BY rowid ASC").all();
+  const draw = currentDraw();
+  const assignments = draw ? hydratedAssignments(draw.id, [participant], teams).filter((assignment) => assignment.participant.id === participant.id) : [];
+  return { found: true, participant, assignments };
 }
 
 export function lookupEmployee(email) {
@@ -641,6 +775,7 @@ export function exportBackupJson() {
     draws: db.prepare("SELECT id, seed, created_at AS createdAt, reveal_index AS revealIndex FROM draws ORDER BY created_at ASC").all(),
     assignments: db.prepare("SELECT id, draw_id AS drawId, team_id AS teamId, participant_id AS participantId, draw_index AS drawIndex, revealed, revealed_at AS revealedAt FROM assignments ORDER BY draw_index ASC").all(),
     matches: db.prepare("SELECT id, stage, kickoff, home_team_id AS homeTeamId, away_team_id AS awayTeamId, home_score AS homeScore, away_score AS awayScore, status, notes, updated_at AS updatedAt, provider, provider_match_id AS providerMatchId FROM matches ORDER BY updated_at ASC").all(),
+    managerComments: db.prepare("SELECT id, assignment_id AS assignmentId, team_id AS teamId, match_id AS matchId, comment, hidden, created_at AS createdAt, updated_at AS updatedAt FROM manager_comments ORDER BY updated_at ASC").all(),
     audit: db.prepare("SELECT at, event, detail FROM audit_events ORDER BY id ASC").all()
   };
 }
@@ -675,6 +810,38 @@ function getAllowlistStats() {
   const eligible = db.prepare("SELECT COUNT(*) AS count FROM allowed_employees").get().count;
   const joined = db.prepare("SELECT COUNT(*) AS count FROM participants").get().count;
   return { eligible, joined, remaining: Math.max(eligible - joined, 0), required: true };
+}
+
+function getManagerCommentStats() {
+  const total = db.prepare("SELECT COUNT(*) AS count FROM manager_comments WHERE hidden = 0").get().count;
+  const pendingDrama = db.prepare(`
+    SELECT COUNT(*) AS count
+    FROM manager_comments c
+    JOIN matches m ON m.id = c.match_id
+    WHERE c.hidden = 0 AND m.status = 'finished' AND m.home_score IS NOT NULL AND m.away_score IS NOT NULL
+  `).get().count;
+  return { total, pendingDrama };
+}
+
+function cleanManagerComment(value) {
+  const comment = String(value || "").trim().replace(/\s+/g, " ");
+  if (!comment) throw httpError(400, "Manager comment is required.");
+  if (comment.length > 140) throw httpError(400, "Manager comment must be 140 characters or fewer.");
+  if (/[<>]/.test(comment)) throw httpError(400, "Manager comment contains unsupported characters.");
+  const blocked = /\b(fuck|shit|cunt|bitch|bastard|slur)\b/i;
+  if (blocked.test(comment)) throw httpError(400, "Keep manager comments office-safe.");
+  return comment;
+}
+
+function shortDisplayName(value) {
+  const parts = String(value || "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "Manager";
+  return [parts[0], parts[1]?.charAt(0)].filter(Boolean).join(" ");
+}
+
+function initials(value) {
+  const parts = String(value || "").trim().split(/\s+/).filter(Boolean);
+  return (parts.length > 1 ? `${parts[0][0]}${parts[1][0]}` : parts[0]?.slice(0, 2) || "M").toUpperCase();
 }
 
 function normaliseEmail(value) {

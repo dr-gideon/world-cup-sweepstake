@@ -190,3 +190,33 @@ Rationale: Provider data can be incomplete or delayed. Organisers need a direct 
 Decision: Existing fixture result edits should happen inline under the selected match row.
 
 Rationale: Loading imported fixtures into the top add-match form was confusing and looked broken. Inline editing keeps the correction anchored to the match being updated and avoids accidental duplicate fixtures.
+
+## 2026-06-13 — Separate My Team Journey with manager comments
+
+Decision: Add My Team Journey as a separate public `/journey` page instead of putting match timelines and comments inside the Draw page.
+
+Rationale: Draw should stay focused on the reveal moment. Journey is an ongoing tournament surface for fixtures, results, and manager comments.
+
+Decision: Treat participants as team managers for pre-match comments, and send the LLM only team, manager comment, and match result.
+
+Rationale: This keeps Tele Drama Feed engaging while avoiding names, emails, departments, and participant metadata in LLM context.
+
+## 2026-06-13 — Tele as morning catch-up feed
+
+Decision: Redesign `/tele` around overnight results and roasts instead of a live-match TV board.
+
+Rationale: The office is in Europe/Ireland and colleagues are unlikely to watch live overnight World Cup matches in the office. The useful behaviour is reading results and Drama Feed recaps in the morning.
+
+Decision: Tele may show manager comments as team-manager quotes, but not participant names, emails, or departments.
+
+Rationale: Manager comments are intended to feed office banter, but identity metadata should remain out of the public Tele surface and LLM context.
+
+## 2026-06-14 — Show first names on Tele manager comments
+
+Decision: Tele result cards should show manager comments with the participant's first name and team name.
+
+Rationale: Dr. Wells wants the office cards to feel personal and match the intended banter format. The public Tele payload still excludes email, department, and full participant name; LLM drama context remains limited to team/comment/match result.
+
+Decision: Tele manager comments use a compact identity format: initials avatar plus short display name (`First L`) and team.
+
+Rationale: This matches the intended office-TV card design from Dr. Wells' screenshot while keeping the display concise and avoiding email, department, and full participant name exposure.

@@ -3,8 +3,8 @@ import express from "express";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fetchFootballDataMatches } from "./football-data.js";
-import { buildMatchDramaSummary, buildTeleSummary } from "./tele-summary.js";
-import { addParticipant, appendAllowlist, createDraw, createTeleSummary, exportBackupJson, exportNotJoinedCsv, exportParticipantsCsv, getState, hasTeleSummary, importAllowlist, importFootballDataTeams, initDb, lookupEmployee, lookupParticipantTeams, recordProviderSync, removeMatch, removeParticipant, resetSweepstake, revealAll, revealAssignmentForEmail, revealNext, syncFootballDataMatches, updateSettings, updateTeam, upsertMatch } from "./db.js";
+import { buildManagerCommentDramaSummary, buildMatchDramaSummary, buildTeleSummary } from "./tele-summary.js";
+import { addParticipant, appendAllowlist, createDraw, createTeleSummary, exportBackupJson, exportNotJoinedCsv, exportParticipantsCsv, getJourneyForEmail, getManagerCommentDramaCandidates, getState, hasTeleSummary, importAllowlist, importFootballDataTeams, initDb, lookupEmployee, lookupParticipantTeams, recordProviderSync, removeMatch, removeParticipant, resetSweepstake, revealAll, revealAssignmentForEmail, revealNext, syncFootballDataMatches, updateSettings, updateTeam, upsertManagerComment, upsertMatch } from "./db.js";
 
 const app = express();
 const port = Number(process.env.PORT || 8097);
@@ -45,6 +45,8 @@ app.post("/api/auth/logout", (req, res) => {
 app.get("/api/allowlist/lookup", wrap((req, res) => res.json(lookupEmployee(req.query.email))));
 app.get("/api/participants/lookup", wrap((req, res) => res.json(lookupParticipantTeams(req.query.email))));
 app.post("/api/participants", wrap((req, res) => res.status(201).json(addParticipant(req.body))));
+app.get("/api/journey", wrap((req, res) => res.json(getJourneyForEmail(req.query.email))));
+app.post("/api/manager-comments", wrap((req, res) => res.status(201).json(upsertManagerComment(req.body || {}))));
 
 app.post("/api/allowlist", requireAdmin, express.text({ type: ["text/*", "application/csv", "application/vnd.ms-excel"], limit: "2mb" }), wrap((req, res) => res.status(201).json(importAllowlist(req.body))));
 app.post("/api/allowlist/append", requireAdmin, express.text({ type: ["text/*", "application/csv", "application/vnd.ms-excel"], limit: "2mb" }), wrap((req, res) => res.status(201).json(appendAllowlist(req.body))));
@@ -78,17 +80,20 @@ app.post("/api/providers/football-data/sync", requireAdmin, wrap(async (req, res
   res.json({ ...getState(), scheduler: schedulerStatus() });
 }));
 app.post("/api/tele-summary/generate", requireAdmin, wrap(async (req, res) => {
+  await generateDramaForFinishedMatches();
   const summary = await buildTeleSummary({ state: getState(), providerConfig: llmConfig() });
   createTeleSummary(summary);
   res.json(getState());
 }));
-app.post("/api/matches", requireAdmin, wrap((req, res) => { upsertMatch(req.body || {}); res.status(201).json(getState()); }));
-app.patch("/api/matches/:id", requireAdmin, wrap((req, res) => { upsertMatch({ ...(req.body || {}), id: req.params.id }); res.json(getState()); }));
+app.post("/api/matches", requireAdmin, wrap(async (req, res) => { upsertMatch(req.body || {}); await generateDramaForFinishedMatches(); res.status(201).json(getState()); }));
+app.patch("/api/matches/:id", requireAdmin, wrap(async (req, res) => { upsertMatch({ ...(req.body || {}), id: req.params.id }); await generateDramaForFinishedMatches(); res.json(getState()); }));
 app.delete("/api/matches/:id", requireAdmin, wrap((req, res) => { removeMatch(req.params.id); res.status(204).end(); }));
 app.post("/api/reset", requireAdmin, wrap((req, res) => { resetSweepstake(); res.json(getState()); }));
 
+app.use("/draw", (req, res, next) => { if (req.method !== "GET") return next(); res.type("html").send(readFileSync(indexPath, "utf8")); });
 app.use("/tele", (req, res, next) => { if (req.method !== "GET") return next(); res.type("html").send(readFileSync(indexPath, "utf8")); });
 app.use("/stream", (req, res, next) => { if (req.method !== "GET") return next(); res.type("html").send(readFileSync(indexPath, "utf8")); });
+app.use("/journey", (req, res, next) => { if (req.method !== "GET") return next(); res.type("html").send(readFileSync(indexPath, "utf8")); });
 app.use("/admin", (req, res, next) => { if (req.method !== "GET") return next(); res.type("html").send(readFileSync(indexPath, "utf8")); });
 
 if (existsSync(distPath)) {
@@ -160,8 +165,16 @@ async function runFootballDataSync({ dateFrom = "", dateTo = "", manual = false 
 
 async function generateDramaForFinishedMatches() {
   const state = getState();
-  const finished = (state.matches || []).filter((match) => match.status === "finished" && match.homeScore !== null && match.homeScore !== undefined && match.awayScore !== null && match.awayScore !== undefined).slice(-12);
+  const managerComments = getManagerCommentDramaCandidates();
   let generated = 0;
+  for (const candidate of managerComments) {
+    const sourceKey = `manager-comment:${candidate.commentId}:${candidate.matchId}:${candidate.homeScore ?? ""}:${candidate.awayScore ?? ""}`;
+    if (hasTeleSummary(sourceKey)) continue;
+    const summary = await buildManagerCommentDramaSummary({ sourceKey, candidate, providerConfig: llmConfig() });
+    createTeleSummary(summary);
+    generated += 1;
+  }
+  const finished = (state.matches || []).filter((match) => match.status === "finished" && match.homeScore !== null && match.homeScore !== undefined && match.awayScore !== null && match.awayScore !== undefined).slice(-12);
   for (const match of finished) {
     const sourceKey = `match:${match.id}:${match.status}:${match.homeScore ?? ""}:${match.awayScore ?? ""}`;
     if (hasTeleSummary(sourceKey)) continue;

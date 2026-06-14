@@ -438,3 +438,205 @@ A clean clone production-style dry-run passed on temp port `8108` with temp DB:
 
 - Stopped the isolated temp simulation server on port `8110` after end-to-end testing passed.
 - Final local gate before commit/push prep passed: `npm run build`, `npm test`, and `git diff --check`.
+
+## 2026-06-13 — My Team Journey and manager comments local build
+
+- Added public `/journey` surface for My Team Journey, separate from the Draw page.
+- Journey lookup uses work email and returns only the matching participant's managed teams, fixtures, and saved manager comments.
+- Added SQLite `manager_comments` table with one office-safe comment per assignment/match.
+- Manager comment posting verifies the email owns that team assignment, the fixture belongs to that team, and the match has not started.
+- Tele Drama Feed keeps the existing label but now prioritizes LLM summaries generated from manager comments plus match results.
+- LLM manager-comment context contains only team, manager comment, and match result; no name, email, or department is sent.
+- Generic finished-match drama remains as fallback when no manager comments exist.
+- Manual match result saves and Football-Data sync both trigger manager-comment drama generation for finished scored matches.
+- Local preview rebuilt and restarted on `http://100.86.180.12:8097/journey`; production company server was not touched.
+- Preview Football-Data auto-sync is off in the current local shell because the API key was not available after restart.
+- Verification passed: `node --check server/index.js`, `node --check server/db.js`, `node --check server/tele-summary.js`, `npm test`, `npm run build`, `git diff --check`, temp SQLite journey/comment smoke, `/journey` HTTP 200, and served bundle readback.
+
+## 2026-06-13 — Tele morning catch-up redesign local build
+
+- Redesigned `/tele` from a live scoreboard layout into a morning catch-up feed for Europe/Ireland office use.
+- Added compact top strip for live-now or next fixture status.
+- Replaced split fixtures/drama layout with full-width `Overnight results & roasts` cards.
+- Result cards show teams, score, date/time, roast category pill, Drama Feed summary, and optional team-manager quote.
+- Manager quote display uses only team-manager framing; no participant name, email, or department is shown.
+- Added public `teleManagerComments` state with comment/team/match context only, so Tele can show manager comments without private identity metadata.
+- Local preview rebuilt and restarted on `http://100.86.180.12:8097/tele`; production company server was not touched.
+- Verification passed: `node --check server/db.js`, `npm run build`, `npm test`, `git diff --check`, `/tele` HTTP 200, served bundle readback, and `/api/state` includes `teleManagerComments`.
+
+## 2026-06-13 — End-of-day handoff
+
+- Local-only work completed for My Team Journey, manager comments, manager-comment Drama Feed generation, and the redesigned morning `/tele` layout.
+- No production deployment, no company server access, no Docker changes, and no commit/push were performed.
+- Local preview is running at `http://100.86.180.12:8097/` with key surfaces:
+  - `/journey` — My Team Journey email lookup, managed-team timelines, pre-match manager comments.
+  - `/tele` — morning catch-up layout with overnight results and roasts.
+  - `/admin` — organiser controls, local preview password currently `preview-password`.
+- Current local preview was restarted with `FOOTBALL_DATA_AUTO_SYNC=0` because the Football-Data API key was not available in the shell after restart.
+- Git working tree intentionally has uncommitted local changes in:
+  - `DECISIONS.md`
+  - `STATUS.md`
+  - `server/db.js`
+  - `server/index.js`
+  - `server/tele-summary.js`
+  - `src/main.jsx`
+  - `src/styles.css`
+- Backup copies from edits were moved out of the project tree to `.runtime-backups/world-cup-sweepstake/`.
+- Last verification passed:
+  - `node --check server/index.js`
+  - `node --check server/db.js`
+  - `node --check server/tele-summary.js`
+  - `npm test`
+  - `npm run build`
+  - `git diff --check`
+  - temp SQLite journey/comment/manager-drama smoke
+  - `/journey` and `/tele` HTTP 200 on local preview
+- Suggested tomorrow:
+  1. Review `/journey` UX in browser with realistic draw/match data.
+  2. Review `/tele` morning layout visually with seeded finished matches and manager comments.
+  3. Decide whether to commit locally.
+  4. If approved, prepare production Docker deployment instructions, then wait for the magic phrase before touching production.
+
+## 2026-06-14 — Tele manager names and preview Football-Data key
+
+- Updated `/tele` result cards to show manager comments with the participant's first name and team name, e.g. `Dave · Paraguay`.
+- Tele comment payload now includes `managerFirstName` only; email, department, and full participant name remain excluded from public Tele state.
+- Multiple manager comments for the same match now render on the same Tele result card.
+- Restarted the local preview on `http://100.86.180.12:8097/` using the Football-Data API key from `/home/giddy/temp/football-data-api`.
+- Local preview Football-Data auto-sync is enabled: `FOOTBALL_DATA_AUTO_SYNC=1`, interval 15 minutes.
+- Startup sync completed successfully: imported 72 matches, skipped 32, generated 3 drama items.
+- Production company server was not touched.
+- Verification passed: `node --check server/index.js`, `node --check server/db.js`, `node --check server/tele-summary.js`, `npm test`, `npm run build`, `git diff --check`, temp SQLite Tele manager-first-name smoke, `/api/state` HTTP 200, scheduler enabled.
+
+## 2026-06-14 — Tele comment row matched screenshot
+
+- Adjusted `/tele` manager-comment rows to match Dr. Wells' screenshot direction:
+  - initials avatar on the left, e.g. `DK`
+  - italic quoted comment in the middle
+  - short manager display name and team on the right, e.g. `Dave K · Paraguay`
+- Public Tele state now exposes `managerInitials` and `managerDisplayName`; email, department, and full participant name remain excluded.
+- Rebuilt and restarted the local preview on `http://100.86.180.12:8097/` with Football-Data auto-sync still enabled from the temp key.
+- Production company server was not touched.
+- Verification passed: `node --check server/db.js`, `node --check server/index.js`, `npm test`, `npm run build`, `git diff --check`, temp SQLite `DK / Dave K` Tele comment smoke, `/tele` HTTP 200, `/journey` HTTP 200, `/admin` HTTP 200, and `/api/state` scheduler enabled.
+
+## 2026-06-14 — Isolated E2E simulation server
+
+- Started an isolated simulation server on `http://100.86.180.12:8110/` using a temporary SQLite DB at `/tmp/world-cup-sweepstake-sim-20260614T151449Z/sweepstake.sqlite`.
+- Admin credentials for simulation only: `admin` / `simulation-password`.
+- Simulation env uses Football-Data key from `/home/giddy/temp/football-data-api`, OpenRouter key from `/home/giddy/temp/sweepstakes_openrouter_key`, and `FOOTBALL_DATA_AUTO_SYNC=1`.
+- Pre-loaded simulation DB through Admin API: imported 48 Football-Data teams and synced 72 matches; 32 provider rows skipped because of TBD/unmatched teams.
+- Surfaces verified on sim port: `/`, `/draw`, `/tele`, `/journey`, `/stream`, `/admin` all HTTP 200.
+- Production company server and main local preview DB were not touched.
+
+## 2026-06-14 — Draw page stream link
+
+- Added a Draw page CTA card linking to `/stream`: `Watch the live reveal stream`.
+- The CTA uses SPA navigation in-app and a normal `/stream` href for direct browser access.
+- Rebuilt and restarted both local preview (`8097`) and isolated simulation (`8110`) with the existing simulation temp DB preserved.
+- Verified `/draw`, `/stream`, and `/api/state` return HTTP 200 on both ports; built asset contains the new stream CTA copy.
+- Verification passed: `node --check server/index.js`, `node --check server/db.js`, `npm test`, `npm run build`, and `git diff --check`.
+- Production company server was not touched.
+
+## 2026-06-14 — Route and stream UI fixes
+
+- Made `/draw` a first-class frontend route, so refreshing on Draw now returns to Draw instead of Enter.
+- Added an explicit server route for `/draw` alongside `/tele`, `/stream`, `/journey`, and `/admin`.
+- Public nav now updates the browser URL for Enter, Draw, and Journey.
+- Updated the Draw page stream CTA to open `/stream` in a new tab/window.
+- Removed the top nav from `/stream`; stream remains an office/display surface with ticker and stream content only.
+- Rebuilt and restarted both local preview (`8097`) and isolated simulation (`8110`), preserving the simulation temp DB.
+- Verification passed: `node --check server/index.js`, `node --check server/db.js`, `npm test`, `npm run build`, `git diff --check`, and HTTP 200 for `/draw`, `/stream`, `/journey`, `/api/state` on both ports.
+- Production company server was not touched.
+
+## 2026-06-14 — My Team Journey timeline opponent context
+
+- Updated My Team Journey timeline rows to show both team crests beside the scoreline.
+- Timeline rows now show the opposing manager's participant name when the opponent team has been assigned, e.g. `Against Alex Murphy`; unassigned opponent teams show `Against Unassigned`.
+- Emails and departments remain excluded from this timeline context.
+- Rebuilt and restarted both local preview (`8097`) and isolated simulation (`8110`), preserving the simulation temp DB.
+- Verification passed: `node --check server/index.js`, `node --check server/db.js`, `npm test`, `npm run build`, `git diff --check`, `/journey` and `/api/state` HTTP 200 on both ports, and simulated journey lookup for `alex.murphy@example.com` returned assignments, matches, and crest URLs.
+- Production company server was not touched.
+
+## 2026-06-14 — Journey crest cleanup and next-fixture opponent
+
+- Removed the visible box/background/border around timeline team crests so flags sit cleanly inline with the scoreline.
+- Added opposing manager context to the Next Fixture card, e.g. `18 Jun 19:00 · Against Niamh Kennedy`.
+- Timeline opponent manager context remains in place.
+- Rebuilt and restarted both local preview (`8097`) and isolated simulation (`8110`), preserving the simulation temp DB.
+- Verification passed: `node --check server/index.js`, `node --check server/db.js`, `npm test`, `npm run build`, `git diff --check`, `/journey` and `/api/state` HTTP 200 on both ports, and built asset includes the updated `Against` next-fixture copy.
+- Production company server was not touched.
+
+## 2026-06-14 — Journey opponent highlight and timeline order
+
+- Highlighted opponent manager names in both Next Fixture and Timeline `Against <name>` text.
+- Changed My Team Journey timeline ordering so the immediate Next Fixture is not duplicated in the lower timeline.
+- Lower timeline now sorts remaining upcoming fixtures first, then live/postponed/other states, with finished matches at the bottom.
+- Rebuilt and restarted both local preview (`8097`) and isolated simulation (`8110`), preserving the simulation temp DB.
+- Verification passed: `node --check server/index.js`, `node --check server/db.js`, `npm test`, `npm run build`, `git diff --check`, `/journey` and `/api/state` HTTP 200 on both ports, and simulated journey lookup for `alex.murphy@example.com` still returns 2 assignments and 6 matches.
+- Production company server was not touched.
+
+## 2026-06-14 — Journey Tele link and timeline crest alignment
+
+- Added a hyperlink from My Team Journey intro copy to `/tele` on `Tele Drama Feed`; it opens in a new tab.
+- Reworked Journey timeline scoreline layout so each crest is grouped with its country code instead of being a separate floating item.
+- Timeline country/crest groups now align from the top, avoiding the second crest dropping underneath wrapped text.
+- Kept the cleaned no-box crest styling from the previous pass.
+- Rebuilt and restarted both local preview (`8097`) and isolated simulation (`8110`), preserving the simulation temp DB.
+- Verification passed: `node --check server/index.js`, `node --check server/db.js`, `npm test`, `npm run build`, `git diff --check`, `/journey`, `/tele`, and `/api/state` HTTP 200 on both ports, and simulated journey lookup for `eoin.byrne@example.com` returned 2 assignments and 6 matches.
+- Production company server was not touched.
+
+## 2026-06-14 — Tele live-card polish
+
+- Replaced the plain Tele top strip with a full `Live now` / `Next up` fixture card.
+- Live card now shows large team crests, large team names, centered score/VS, kickoff context, and manager names under each team.
+- Simplified Tele manager comment rows by removing the team name from the comment metadata; rows now show initials, quote, and manager display name only.
+- Rebuilt and restarted both local preview (`8097`) and isolated simulation (`8110`), preserving the simulation temp DB and seeded manager comments.
+- Seeded a live match state in the simulation DB so the polished Live Now card can be visually reviewed on `/tele`.
+- Verification passed: `node --check server/index.js`, `node --check server/db.js`, `npm test`, `npm run build`, `git diff --check`, `/tele` HTTP 200 on both ports, and sim `/api/state` confirms live matches plus 17 Tele manager comments.
+- Production company server was not touched.
+
+## 2026-06-14 — Tele live-card clean surface
+
+- Removed the green/blue radial fade from the Tele Live Now card.
+- Live card now uses the same clean dark card surface as result cards; live state is carried by the green dot and border only.
+- Rebuilt and restarted both local preview (`8097`) and isolated simulation (`8110`), preserving the simulation temp DB.
+- Verification passed: `npm run build`, `git diff --check`, and `/tele` HTTP 200 on both ports.
+- Production company server was not touched.
+
+## 2026-06-14 — Tele finished-card managers persist
+
+- Added manager/user names under both teams on finished Tele result cards, matching the Live Now card pattern.
+- Finished cards now show manager names regardless of whether manager comments exist for that match.
+- Rebuilt and restarted both local preview (`8097`) and isolated simulation (`8110`), preserving the simulation temp DB and seeded comments/live state.
+- Verification passed: `node --check server/index.js`, `node --check server/db.js`, `npm test`, `npm run build`, `git diff --check`, `/tele` HTTP 200 on both ports, and sim state readback confirmed finished matches can resolve assigned managers.
+- Production company server was not touched.
+
+## 2026-06-14 — Tele finished-card alignment cleanup
+
+- Removed country abbreviations from finished Tele result cards.
+- Finished card team blocks now match the Live Now pattern: crest, full country name, manager name.
+- Adjusted result scoreline alignment so both team blocks top-align cleanly around the centered score.
+- Rebuilt and restarted both local preview (`8097`) and isolated simulation (`8110`), preserving the simulation temp DB.
+- Verification passed: `node --check server/index.js`, `node --check server/db.js`, `npm test`, `npm run build`, `git diff --check`, and `/tele` HTTP 200 on both ports.
+- Production company server was not touched.
+
+## 2026-06-14 — Simulation stopped
+
+- Stopped the isolated simulation server on port `8110` after Dr. Wells finished UI testing.
+- Main local preview on port `8097` remains running.
+- Simulation temp DB remains on disk at `/tmp/world-cup-sweepstake-sim-20260614T151449Z/sweepstake.sqlite` in case review data is needed later.
+- Production company server was not touched.
+
+## 2026-06-14 — Pre-push audit blocker fixes
+
+- Ran four focused audit passes before push: code correctness, security/privacy, UI/product, and runtime/deploy.
+- Local gates passed before fixes and again after fixes: `node --check server/index.js`, `node --check server/db.js`, `node --check server/tele-summary.js`, `npm test`, `npm run build`, and `git diff --check`.
+- Fixed the main sealed-reveal blocker:
+  - public `/api/state` now replaces unrevealed assignments with a sealed placeholder team instead of exposing team/participant mappings;
+  - personal `/api/participants/lookup` still returns the requesting participant's assignments so the Draw reveal flow can work;
+  - `/api/journey` only returns revealed assignments, so My Team Journey stays locked until the participant reveals.
+- Limited public Tele manager-comment payload to comments tied to finished scored matches only; future/pre-match comments no longer appear in `teleManagerComments` from `/api/state`.
+- Switched Tele and Journey opponent/manager display helpers to compact names (`First L`) instead of full participant names.
+- Added a targeted temp SQLite sealed-state smoke: public state sealed unrevealed teams, personal lookup kept reveal target, Journey stayed locked before reveal, Journey opened after reveal, scheduled comments were hidden from Tele, and finished scored comments appeared.
+- Restarted main local preview on `8097`; isolated simulation remains stopped.
+- Production company server was not touched.

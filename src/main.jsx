@@ -14,7 +14,7 @@ const STAGES = [
   { value: "eliminated", label: "Out" }
 ];
 
-const PUBLIC_NAV = ["enter", "draw"];
+const PUBLIC_NAV = ["enter", "draw", "journey"];
 const REVEAL_AUDIO = {
   1: ["/audio/reveal-pot-1-a.mp3", "/audio/reveal-pot-1-b.mp3"],
   2: ["/audio/reveal-pot-2-a.mp3", "/audio/reveal-pot-2-b.mp3"],
@@ -27,7 +27,9 @@ function App() {
   const isTeleRoute = route === "/tele";
   const isStreamRoute = route === "/stream";
   const isAdminRoute = route === "/admin";
-  const [page, setPage] = useState(isTeleRoute ? "tele" : isStreamRoute ? "stream" : isAdminRoute ? "admin" : "enter");
+  const isJourneyRoute = route === "/journey";
+  const isDrawRoute = route === "/draw";
+  const [page, setPage] = useState(isTeleRoute ? "tele" : isStreamRoute ? "stream" : isAdminRoute ? "admin" : isJourneyRoute ? "journey" : isDrawRoute ? "draw" : "enter");
   const [state, setState] = useState(null);
   const [adminAuthed, setAdminAuthed] = useState(false);
   const [error, setError] = useState("");
@@ -56,6 +58,12 @@ function App() {
     return () => clearInterval(id);
   }, [isTeleRoute, isStreamRoute, isAdminRoute]);
 
+  function navigatePage(nextPage) {
+    const path = nextPage === "enter" ? "/" : `/${nextPage}`;
+    if (window.location.pathname !== path) window.history.pushState({}, "", path);
+    setPage(nextPage);
+  }
+
   function showToast(message) {
     setToast(message);
     setTimeout(() => setToast(null), 3000);
@@ -80,21 +88,22 @@ function App() {
 
   return <div className="app">
     <div className="ticker"><div className="ticker-inner">{repeatTickerItems(state).map((item, i) => <span key={i}>{item}<b> · </b></span>)}</div></div>
-    {!isTeleRoute && <nav>
-      <button className="nav-logo" onClick={() => isAdminRoute ? null : setPage("enter")} aria-label="Home">
+    {!isTeleRoute && !isStreamRoute && <nav>
+      <button className="nav-logo" onClick={() => isAdminRoute ? null : navigatePage("enter")} aria-label="Home">
         <span className="world-cup-mark" aria-hidden="true">🏆</span>
         <div><div className="nav-title">World Cup 2026</div><div className="nav-sub">Office Sweepstake</div></div>
       </button>
-      {!isAdminRoute && <div className="nav-links">{PUBLIC_NAV.map((item) => <button key={item} className={`nav-link ${page === item ? "active" : ""}`} onClick={() => setPage(item)}>{label(item)}</button>)}</div>}
+      {!isAdminRoute && <div className="nav-links">{PUBLIC_NAV.map((item) => <button key={item} className={`nav-link ${page === item ? "active" : ""}`} onClick={() => navigatePage(item)}>{label(item)}</button>)}</div>}
       {isAdminRoute && <div className="nav-links"><span className="admin-route-pill">Admin console</span></div>}
     </nav>}
     {error && <div className="error-bar">{error}</div>}
-    {page === "enter" && <EnterPage state={state} action={action} setPage={setPage} setRegisteredNotice={setRegisteredNotice} />}
-    {page === "draw" && <DrawPage state={state} action={action} setPage={setPage} />}
+    {page === "enter" && <EnterPage state={state} action={action} setPage={navigatePage} setRegisteredNotice={setRegisteredNotice} />}
+    {page === "draw" && <DrawPage state={state} action={action} setPage={navigatePage} />}
+    {page === "journey" && <JourneyPage state={state} />}
     {page === "tele" && <TelePage state={state} />}
     {page === "stream" && <StreamPage state={state} />}
     {page === "admin" && <AdminGate authed={adminAuthed} setAuthed={setAdminAuthed} refresh={refresh}><AdminPage state={state} action={action} refresh={refresh} /></AdminGate>}
-    {registeredNotice && <RegistrationModal notice={registeredNotice} onClose={() => setRegisteredNotice(null)} onDraw={() => { setRegisteredNotice(null); setPage("draw"); }} />}
+    {registeredNotice && <RegistrationModal notice={registeredNotice} onClose={() => setRegisteredNotice(null)} onDraw={() => { setRegisteredNotice(null); navigatePage("draw"); }} />}
     {toast && <div className="success-toast">{toast}</div>}
   </div>;
 }
@@ -275,6 +284,12 @@ function DrawPage({ state, action, setPage }) {
     <h1 className="hero-title small">{state.draw ? "Your team reveal." : "Ready to draw?"}</h1>
     <p className="hero-body">{state.draw ? "Find your entry and reveal your team draw with the drama it deserves." : "Once verified players have entered, the organiser will run the draw from Admin."}</p>
 
+    <a className="stream-link-card" href="/stream" target="_blank" rel="noreferrer">
+      <span>📺</span>
+      <div><b>Watch the live reveal stream</b><em>See every revealed team as the board fills up</em></div>
+      <strong>Open stream →</strong>
+    </a>
+
     <DrawTimePanel startsAt={drawStartsAt} remainingMs={drawRemainingMs} />
 
     {!state.draw && <Empty icon="🎲" title="Draw hasn't run yet" desc={drawStartsAt ? "The draw time is set. Come back here when the countdown ends." : "Enter with your work email, then come back when the organiser starts the draw."} />}
@@ -381,6 +396,113 @@ function TeamsPage({ state }) {
   </main>;
 }
 
+function JourneyPage({ state }) {
+  const [email, setEmail] = useState(readRememberedParticipant()?.email || "");
+  const [journey, setJourney] = useState(null);
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function loadJourney(event) {
+    event?.preventDefault?.();
+    if (!email.trim()) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      const result = await api(`/api/journey?email=${encodeURIComponent(email)}`);
+      setJourney(result);
+      if (!result.found) setMessage("No draw entry found for that email yet.");
+    } catch (err) {
+      setMessage(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveComment({ assignmentId, matchId, comment }) {
+    const result = await api("/api/manager-comments", { method: "POST", body: { assignmentId, matchId, email, comment } });
+    setJourney(result);
+    setMessage("Manager comment saved for the Drama Feed.");
+  }
+
+  return <main className="page journey-page">
+    <section className="journey-hero">
+      <div><div className="hero-eyebrow">My Team Journey</div><h1 className="hero-title small">Manage your World Cup chaos.</h1><p className="hero-body">Use your work email to see the teams you manage, follow their fixtures, and leave one pre-match manager comment for the <a className="inline-link" href="/tele" target="_blank" rel="noreferrer">Tele Drama Feed</a>.</p></div>
+      <form className="journey-lookup" onSubmit={loadJourney}><input className="form-input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@company.com" /><button className="btn btn-primary" disabled={busy || !email.trim()}>{busy ? "Checking…" : "Open journey"}</button></form>
+    </section>
+    {message && <Notice tone={journey?.found ? "ok" : "warn"}>{message}</Notice>}
+    {!state.draw && <Empty icon="🔒" title="Journeys open after the draw" desc="Once teams are assigned, this page becomes each manager's match timeline." />}
+    {state.draw && journey?.found && journey.assignments.length > 0 && <section className="journey-grid">
+      {journey.assignments.map((assignment) => <JourneyTeamCard key={assignment.id} assignment={assignment} matches={journey.matches || []} comments={journey.comments || []} assignments={state.assignments || []} onSaveComment={saveComment} />)}
+    </section>}
+    {state.draw && journey?.found && journey.assignments.length === 0 && <Empty icon="🎁" title="Teams still sealed" desc="Reveal your team on the Draw page first. Your journey opens once your assignment is revealed." />}
+    {state.draw && journey && !journey.found && <Empty icon="📭" title="No entry found" desc="Check the email used when joining the sweepstake." />}
+  </main>;
+}
+
+function JourneyTeamCard({ assignment, matches, comments, assignments, onSaveComment }) {
+  const teamMatches = matches.filter((match) => match.homeTeamId === assignment.team.id || match.awayTeamId === assignment.team.id);
+  const nextMatch = teamMatches.find((match) => match.status === "scheduled" && !matchStarted(match));
+  const timelineMatches = sortJourneyTimelineMatches(teamMatches.filter((match) => match.id !== nextMatch?.id));
+  return <article className="journey-card">
+    <div className="journey-card-head"><div className="journey-flag"><TeamMark flag={assignment.team.flag} name={assignment.team.name} /></div><div><span>Team Manager</span><h2>{assignment.team.name}</h2><p>{assignment.team.code} · Pot {assignment.team.pot} · {stageLabel(assignment.team.status)}</p></div></div>
+    {nextMatch ? <ManagerCommentBox assignment={assignment} match={nextMatch} assignments={assignments} existing={comments.find((comment) => comment.assignmentId === assignment.id && comment.matchId === nextMatch.id)} onSave={onSaveComment} /> : <Notice tone="warn">No upcoming editable fixture for this team yet.</Notice>}
+    <div className="journey-timeline"><div className="section-label">Timeline</div>{timelineMatches.length ? timelineMatches.map((match) => <JourneyMatchRow key={match.id} match={match} teamId={assignment.team.id} assignments={assignments} comment={comments.find((item) => item.assignmentId === assignment.id && item.matchId === match.id)} />) : <p className="journey-empty">Future fixtures and finished results will appear here after the next fixture.</p>}</div>
+  </article>;
+}
+
+function ManagerCommentBox({ assignment, match, assignments, existing, onSave }) {
+  const [comment, setComment] = useState(existing?.comment || "");
+  const [saving, setSaving] = useState(false);
+  useEffect(() => setComment(existing?.comment || ""), [existing?.comment, match.id]);
+  async function submit(event) {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      await onSave({ assignmentId: assignment.id, matchId: match.id, comment });
+    } finally {
+      setSaving(false);
+    }
+  }
+  const opponentManager = opponentManagerName(match, assignment.team.id, assignments);
+  return <form className="manager-comment-box" onSubmit={submit}>
+    <div><span>Next fixture</span><b>{match.homeName} v {match.awayName}</b><em>{formatMatchDate(match.kickoff)} {formatMatchTime(match.kickoff)} · Against <strong>{opponentManager}</strong></em></div>
+    <textarea value={comment} maxLength={140} onChange={(e) => setComment(e.target.value)} placeholder={`As ${assignment.team.name} manager, say something before kickoff…`} />
+    <div className="manager-comment-actions"><small>{comment.length}/140 · no names or emails needed</small><button className="btn btn-primary" disabled={saving || !comment.trim()}>{saving ? "Saving…" : existing ? "Update comment" : "Save comment"}</button></div>
+  </form>;
+}
+
+function JourneyMatchRow({ match, teamId, assignments, comment }) {
+  const side = match.homeTeamId === teamId ? "home" : "away";
+  const opponentManager = opponentManagerName(match, teamId, assignments);
+  return <div className={`journey-match-row ${match.status}`}>
+    <div className="journey-match-time"><b>{formatMatchDate(match.kickoff)}</b><span>{formatMatchTime(match.kickoff) || match.stage}</span></div>
+    <div className="journey-match-teams">
+      <span className="journey-team-side"><TeamMark flag={match.homeFlag} name={match.homeName} /><strong>{match.homeCode}</strong></span>
+      <b>{scoreText(match)}</b>
+      <span className="journey-team-side away"><strong>{match.awayCode}</strong><TeamMark flag={match.awayFlag} name={match.awayName} /></span>
+    </div>
+    <div className="journey-match-meta"><em>{side === "home" ? "Home" : "Away"} · {match.status}</em><small>Against <strong>{opponentManager}</strong></small>{comment && <small className="saved">Manager comment saved</small>}</div>
+  </div>;
+}
+
+function opponentManagerName(match, teamId, assignments) {
+  const side = match.homeTeamId === teamId ? "home" : "away";
+  const opponentTeamId = side === "home" ? match.awayTeamId : match.homeTeamId;
+  const opponentAssignment = assignments.find((assignment) => assignment.team.id === opponentTeamId);
+  return shortDisplayName(opponentAssignment?.participant?.name) || "Unassigned";
+}
+
+function sortJourneyTimelineMatches(matches) {
+  return [...matches].sort((a, b) => journeyMatchSortRank(a) - journeyMatchSortRank(b) || matchTime(a) - matchTime(b));
+}
+
+function journeyMatchSortRank(match) {
+  if (match.status === "scheduled" && !matchStarted(match)) return 0;
+  if (match.status === "live") return 1;
+  if (match.status === "postponed") return 2;
+  if (match.status === "finished") return 4;
+  return 3;
+}
 
 function StreamPage({ state }) {
   const revealed = [...(state.assignments || [])].filter((assignment) => assignment.revealed).sort((a, b) => revealTime(b) - revealTime(a));
@@ -422,29 +544,113 @@ function StreamPage({ state }) {
 }
 
 function TelePage({ state }) {
-  const summaries = latestDramaSummaries(state);
+  const live = (state.matches || []).filter((match) => match.status === "live");
+  const upcoming = (state.matches || []).filter((match) => match.status === "scheduled").sort((a, b) => matchTime(a) - matchTime(b));
+  const results = overnightResultMatches(state);
   return <main className="page tele-page">
-    <div className="tele-frame tv-lite">
-      <div className="tele-top"><span>OFFICE WORLD CUP SWEEPSTAKE</span><b>FIXTURES + DRAMA</b><span>{new Date().toLocaleTimeString("en-IE", { hour: "2-digit", minute: "2-digit" })}</span></div>
-      <section className="tv-board">
-        <div className="tele-card fixtures-card"><div className="section-label">Fixtures & results</div><TeleMatches matches={state.matches || []} /></div>
-        <div className="tele-card drama-card"><div className="section-label">Latest drama</div>{summaries.length ? summaries.slice(0, 5).map((summary) => <div className="impact-row roast-row" key={summary.id}><b>{summary.headline}</b><span>{summary.body}</span></div>) : <Empty icon="📺" title="No drama yet" desc="Finished-match summaries will appear here after sync or manual generation." />}</div>
+    <div className="tele-frame morning-tele">
+      <TeleNowCard match={live[0] || upcoming[0]} live={Boolean(live[0])} assignments={state.assignments || []} />
+      <div className="morning-section-title"><span>Overnight results & roasts</span></div>
+      <section className="overnight-feed">
+        {results.length ? results.map((match) => <TeleResultCard key={match.id} match={match} summary={summaryForMatch(state, match)} managerComments={managerCommentsForMatch(state, match)} assignments={state.assignments || []} />) : <div className="tele-empty-card"><Empty icon="☕" title="No overnight damage" desc="Finished results and roasts will appear here for the morning catch-up." />{upcoming.slice(0, 4).map((match) => <div className="tele-mini-fixture" key={match.id}>{compactUpcomingLine(match)}</div>)}</div>}
       </section>
     </div>
   </main>;
 }
 
-function latestDramaSummaries(state) {
-  const scoredFinished = [...(state.matches || [])].filter((match) => match.status === "finished" && hasScore(match)).sort((a, b) => matchTime(b) - matchTime(a));
-  const matchSummaries = (state.teleSummaries || [])
-    .map((summary) => ({ ...summary, matchId: String(summary.sourceKey || "").match(/^match:([^:]+):/)?.[1] }))
-    .filter((summary) => summary.matchId);
-  if (!scoredFinished.length) return [];
-  const latestMatchId = scoredFinished[0].id;
-  const latest = matchSummaries.filter((summary) => summary.matchId === latestMatchId);
-  if (latest.length) return latest;
-  const scoredFinishedIds = new Set(scoredFinished.map((match) => match.id));
-  return matchSummaries.filter((summary) => scoredFinishedIds.has(summary.matchId));
+function TeleNowCard({ match, live, assignments }) {
+  if (!match) return <section className="tele-now-card empty"><div><span className="tele-now-kicker">Today</span><h2>No fixtures scheduled</h2><p>The Tele feed will wake up when fixtures or results arrive.</p></div></section>;
+  const homeManager = teleManagerForTeam(assignments, match.homeTeamId);
+  const awayManager = teleManagerForTeam(assignments, match.awayTeamId);
+  return <section className={`tele-now-card ${live ? "live" : "upcoming"}`}>
+    <div className="tele-now-status"><span className={live ? "live-dot on" : "live-dot"} />{live ? "Live now" : "Next up"}</div>
+    <div className="tele-now-fixture">
+      <div className="tele-now-team"><TeamMark flag={match.homeFlag} name={match.homeName} /><div><b>{match.homeName}</b><em>{homeManager}</em></div></div>
+      <div className="tele-now-score"><strong>{live && hasScore(match) ? `${match.homeScore}:${match.awayScore}` : "vs"}</strong><span>{formatMatchDate(match.kickoff)} · {formatMatchTime(match.kickoff) || match.stage}</span></div>
+      <div className="tele-now-team away"><div><b>{match.awayName}</b><em>{awayManager}</em></div><TeamMark flag={match.awayFlag} name={match.awayName} /></div>
+    </div>
+  </section>;
+}
+
+function TeleResultCard({ match, summary, managerComments = [], assignments = [] }) {
+  const category = resultCategory(match);
+  const homeManager = teleManagerForTeam(assignments, match.homeTeamId);
+  const awayManager = teleManagerForTeam(assignments, match.awayTeamId);
+  return <article className="tele-result-card">
+    <div className="tele-result-scoreline">
+      <div className="tele-result-team"><TeamMark flag={match.homeFlag} name={match.homeName} /><div><b>{match.homeName}</b><em>{homeManager}</em></div></div>
+      <div className="tele-result-score"><strong>{match.homeScore}:{match.awayScore}</strong><span>{formatMatchDate(match.kickoff)} · {formatMatchTime(match.kickoff)}</span></div>
+      <div className="tele-result-team away"><div><b>{match.awayName}</b><em>{awayManager}</em></div><TeamMark flag={match.awayFlag} name={match.awayName} /></div>
+    </div>
+    <div className="tele-result-body">
+      <div className={`roast-pill ${category.tone}`}>{category.icon} {category.label}</div>
+      <h2>{summary?.headline || `${match.homeCode} ${scoreText(match)} ${match.awayCode}`}</h2>
+      <p>{summary?.body || `${match.homeName} and ${match.awayName} have filed their overnight paperwork. The Drama Feed is waiting for a proper roast.`}</p>
+      {managerComments.length > 0 && <div className="manager-quotes">{managerComments.map((managerComment) => <div className="manager-quote" key={managerComment.id}><span>{managerComment.managerInitials}</span><q>{managerComment.comment}</q><em>{managerComment.managerDisplayName}</em></div>)}</div>}
+    </div>
+  </article>;
+}
+
+function overnightResultMatches(state) {
+  const finished = [...(state.matches || [])].filter((match) => match.status === "finished" && hasScore(match)).sort((a, b) => matchTime(b) - matchTime(a));
+  if (!finished.length) return [];
+  const now = state.serverNow ? new Date(state.serverNow) : new Date();
+  const cutoff = new Date(now);
+  cutoff.setHours(18, 0, 0, 0);
+  if (now.getHours() < 12) cutoff.setDate(cutoff.getDate() - 1);
+  const overnight = finished.filter((match) => matchTime(match) >= cutoff.getTime());
+  return (overnight.length ? overnight : finished).slice(0, 6);
+}
+
+function summaryForMatch(state, match) {
+  const summaries = (state.teleSummaries || [])
+    .map((summary) => ({ ...summary, matchId: String(summary.sourceKey || "").match(/^(?:match|manager-comment:[^:]+):([^:]+):/)?.[1], managerComment: String(summary.sourceKey || "").startsWith("manager-comment:") }))
+    .filter((summary) => summary.matchId === match.id)
+    .sort((a, b) => Number(b.managerComment) - Number(a.managerComment) || new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  return summaries[0] || null;
+}
+
+function managerCommentsForMatch(state, match) {
+  const comments = (state.teleManagerComments || []).filter((comment) => comment.matchId === match.id);
+  return [
+    ...comments.filter((comment) => comment.teamId === match.homeTeamId),
+    ...comments.filter((comment) => comment.teamId === match.awayTeamId),
+    ...comments.filter((comment) => comment.teamId !== match.homeTeamId && comment.teamId !== match.awayTeamId)
+  ];
+}
+
+function teleManagerForTeam(assignments, teamId) {
+  const assignment = assignments.find((item) => item.team.id === teamId);
+  return shortDisplayName(assignment?.participant?.name) || "Unassigned manager";
+}
+
+function shortDisplayName(value) {
+  const parts = String(value || "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "";
+  return [parts[0], parts[1]?.charAt(0)].filter(Boolean).join(" ");
+}
+
+function compactMatchLine(match) {
+  return `${match.homeCode} ${scoreText(match)} ${match.awayCode}`;
+}
+
+function compactUpcomingLine(match) {
+  return `${match.homeCode} vs ${match.awayCode} — ${formatMatchTime(match.kickoff) || "TBC"} ${isToday(match.kickoff) ? "today" : formatMatchDate(match.kickoff)}`;
+}
+
+function resultCategory(match) {
+  const diff = Math.abs(Number(match.homeScore) - Number(match.awayScore));
+  if (diff >= 3) return { label: "Dominant", icon: "🔥", tone: "hot" };
+  if (diff === 0) return { label: "Snoozefest", icon: "😴", tone: "flat" };
+  if (diff === 1) return { label: "Nervy", icon: "😬", tone: "edge" };
+  return { label: "Damage", icon: "⚽", tone: "gold" };
+}
+
+function isToday(value) {
+  if (!value) return false;
+  const date = new Date(String(value).length === 16 ? `${value}:00Z` : value);
+  const now = new Date();
+  return date.toDateString() === now.toDateString();
 }
 
 function hasScore(match) {
@@ -455,6 +661,11 @@ function matchTime(match) {
   const source = match.kickoff || match.updatedAt;
   if (!source) return 0;
   return new Date(String(source).length === 16 ? `${source}:00Z` : source).getTime() || 0;
+}
+
+function matchStarted(match) {
+  const time = matchTime(match);
+  return Boolean(time && Date.now() >= time);
 }
 
 
@@ -825,7 +1036,7 @@ function parseCsv(text) {
   return rows;
 }
 function repeatTickerItems(state) { return Array.from({ length: 8 }, () => tickerItems(state)).flat(); }
-function label(view) { return { enter: "Enter", draw: "Draw", teams: "Teams", tele: "Tele", admin: "Admin" }[view]; }
+function label(view) { return { enter: "Enter", draw: "Draw", journey: "My Team Journey", teams: "Teams", tele: "Tele", admin: "Admin" }[view]; }
 function stageLabel(value) { return STAGES.find((stage) => stage.value === value)?.label || value; }
 function potColor(pot) { return ({ 1: { bg: "#FFD700", text: "#1a1200" }, 2: { bg: "#C0C0C0", text: "#111" }, 3: { bg: "#CD7F32", text: "#1a0800" }, 4: { bg: "#2a3050", text: "#9ba3c9" } })[pot] || { bg: "#2a3050", text: "#fff" }; }
 function initials(name) { return String(name || "?").split(/\s+/).slice(0,2).map((p) => p[0]).join("").toUpperCase(); }
