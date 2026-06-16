@@ -668,3 +668,11 @@ A clean clone production-style dry-run passed on temp port `8108` with temp DB:
 - Updated generic fallback winner copy so it no longer uses participant names.
 - Added `test/tele-summary.test.js` coverage confirming private names/departments are not sent in the Tele LLM prompt and fallback copy does not expose participant names.
 - Production Tele summaries were manually backed up and reset by Dr. Wells before this patch; production app code has not been touched yet.
+
+## 2026-06-16 — Tele privacy patch pushed
+
+- Dr. Wells gave the magic phrase `run barry run` for the World Cup Sweepstake Tele privacy patch.
+- Re-ran gates before commit: `node --check server/tele-summary.js`, `npm test`, `npm run build`, and `git diff --check` all passed.
+- Committed and pushed to `origin/main` as `2270207` (`Harden tele drama privacy`).
+- Patch removes departments/private identity from generic Tele LLM context, hardens all Tele prompts with a mandatory privacy rule, and adds Tele summary privacy tests.
+- Production company server was not touched by Gideon; Dr. Wells still needs to pull/rebuild/restart Docker on production.
