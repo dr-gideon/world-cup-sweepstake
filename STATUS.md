@@ -648,3 +648,23 @@ A clean clone production-style dry-run passed on temp port `8108` with temp DB:
 - Committed and pushed audited reveal/Journey/Tele polish to `origin/main` as `9cca225` (`Polish sweepstake reveal and tele flows`).
 - Pushed changes include sealed public assignment state, Journey reveal locking, filtered Tele manager comments, compact public manager names, Draw/Stream/Journey/Tele UI polish, and updated project decision/status logs.
 - Production company server was not touched; this was repository push only.
+
+## 2026-06-14 — Production updated by Dr. Wells
+
+- Dr. Wells updated the production company server successfully after the audited sweepstake polish push.
+- Production update was performed by Dr. Wells on the company server; Gideon did not access or change production directly.
+- Expected production code includes commits:
+  - `9cca225` — `Polish sweepstake reveal and tele flows`
+  - `6713788` — `Log sweepstake polish push`
+- Production should now include sealed public assignment state, Journey reveal locking, filtered Tele manager comments, compact public manager names, Draw/Stream/Journey/Tele UI polish, and Tele live/result card improvements.
+- Reminder for future production updates: use `docker compose down`, `git pull`, `docker compose up -d --build`; do not use `docker compose down -v` unless intentionally removing data/volumes.
+
+## 2026-06-16 — Tele drama privacy hardening
+
+- Investigated production Tele roast inventing departments (`Finance` / `Legal Services`) on the Iran vs New Zealand result card.
+- Root cause: the legacy/generic Tele summary path still included assignment departments in LLM context and the default prompt allowed teasing departments.
+- Patched `server/tele-summary.js` so generic Tele LLM context contains only match/team/status facts, not participant names or departments.
+- Added a mandatory privacy rule to every LLM Tele prompt, including custom `TELE_DRAMA_PROMPT` overrides: do not use or invent names, emails, departments, identities, job roles, companies, or private details.
+- Updated generic fallback winner copy so it no longer uses participant names.
+- Added `test/tele-summary.test.js` coverage confirming private names/departments are not sent in the Tele LLM prompt and fallback copy does not expose participant names.
+- Production Tele summaries were manually backed up and reset by Dr. Wells before this patch; production app code has not been touched yet.

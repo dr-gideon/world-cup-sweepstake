@@ -220,3 +220,9 @@ Rationale: Dr. Wells wants the office cards to feel personal and match the inten
 Decision: Tele manager comments use a compact identity format: initials avatar plus short display name (`First L`) and team.
 
 Rationale: This matches the intended office-TV card design from Dr. Wells' screenshot while keeping the display concise and avoiding email, department, and full participant name exposure.
+
+## 2026-06-16 — Tele drama must never use departments or identities
+
+Decision: All Tele LLM summary paths must exclude participant names, emails, departments, identities, job roles, companies, and private details from both prompt instructions and supplied context. This applies even when a custom `TELE_DRAMA_PROMPT` is configured.
+
+Rationale: Production showed cached Tele drama inventing department-based roasts. The office TV can still be funny using team/result/manager-comment facts only; private or invented workplace identity context is unnecessary and risky.

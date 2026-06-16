@@ -29,8 +29,10 @@ export async function buildManagerCommentDramaSummary({ sourceKey, candidate, pr
 
 const DEFAULT_TELE_DRAMA_PROMPT = [
   "Write one short office-TV World Cup sweepstake roast for colleagues checking scores.",
+  "Use only the supplied match, team, score, and team-status facts.",
+  "Do not use or invent names, emails, departments, identities, job roles, or private details.",
   "Tone: funny, sarcastic, mildly insulting, dry, Irish/UK office banter. No profanity, slurs, cruelty, HR disasters, or invented facts.",
-  "Make it punchy: headline max 12 words, body max 35 words. Tease the team or department if present, but do not use participant names."
+  "Make it punchy: headline max 12 words, body max 35 words. Tease the teams or the result only."
 ].join("\n");
 
 const MANAGER_COMMENT_PROMPT = [
@@ -53,6 +55,7 @@ async function generateSummary({ sourceKey, fallback, context, providerConfig, p
   try {
     const prompt = [
       promptOverride || config.prompt || DEFAULT_TELE_DRAMA_PROMPT,
+      "Mandatory privacy rule: do not use or invent names, emails, departments, identities, job roles, companies, or private details.",
       "Return JSON only with keys headline and body.",
       `Context: ${JSON.stringify(context).slice(0, 5000)}`
     ].join("\n");
@@ -115,7 +118,7 @@ function fallbackSummary(state) {
   const latestMatch = [...(state.matches || [])].reverse().find((match) => match.status === "finished" || match.status === "live") || state.matches?.[0];
   const winner = state.assignments?.find((assignment) => assignment.team.status === "winner");
   const runner = state.assignments?.find((assignment) => assignment.team.status === "runner-up");
-  if (winner) return { headline: `${winner.participant.name} is in the €50 seat`, body: `${winner.team.flag} ${winner.team.name} are marked champion. The office prize race has a leader.` };
+  if (winner) return { headline: `${winner.team.name} are in the €50 seat`, body: `${winner.team.flag} ${winner.team.name} are marked champion. The office prize race has a leader.` };
   if (latestMatch) return { headline: `${latestMatch.homeCode} ${scoreText(latestMatch)} ${latestMatch.awayCode}: office bragging rights updated`, body: `${latestMatch.homeName} vs ${latestMatch.awayName}. Someone is pretending not to care. Nobody believes them.` };
   return { headline: "No drama yet", body: "Add fixtures or update team statuses and the Tele screen will turn them into office sweepstake headlines." };
 }
@@ -123,8 +126,7 @@ function fallbackSummary(state) {
 function compactContext(state) {
   const compactAssignment = (assignment) => ({
     team: assignment.team.name,
-    status: assignment.team.status,
-    department: assignment.participant.department || ""
+    status: assignment.team.status
   });
   return {
     matches: (state.matches || []).slice(-6),
@@ -138,17 +140,15 @@ function compactContext(state) {
 }
 
 function compactImpact(event) {
-  const [teamStatus, ownerText = ""] = String(event.detail || "").split("|").map((part) => part.trim());
-  const department = ownerText.includes(" · ") ? ownerText.split(" · ").slice(1).join(" · ").trim() : "";
-  return { at: event.at, detail: teamStatus, department };
+  const [teamStatus] = String(event.detail || "").split("|").map((part) => part.trim());
+  return { at: event.at, detail: teamStatus };
 }
 
 function compactPrizeAssignment(assignment) {
   if (!assignment) return null;
   return {
     team: assignment.team.name,
-    status: assignment.team.status,
-    department: assignment.participant.department || ""
+    status: assignment.team.status
   };
 }
 
